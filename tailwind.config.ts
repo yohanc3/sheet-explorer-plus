@@ -22,6 +22,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -47,7 +48,16 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Data analysis specific colors
+        data: {
+          success: "hsl(var(--data-success))",
+          warning: "hsl(var(--data-warning))",
+          info: "hsl(var(--data-info))",
+          neutral: "hsl(var(--data-neutral))",
+        },
+        // Layout specific
         sidebar: {
+          bg: "hsl(var(--sidebar-bg))",
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
           primary: "hsl(var(--sidebar-primary))",
@@ -56,6 +66,9 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        iframe: {
+          border: "hsl(var(--iframe-border))",
         },
       },
       borderRadius: {
