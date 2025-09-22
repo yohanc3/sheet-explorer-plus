@@ -44,3 +44,16 @@ export interface SidebarItem {
   label: string;
   data: ParsedData;
 }
+
+export interface NotebookData {
+  [assignmentId: string]: {
+    cells: NotebookCell[];
+    isLoading: boolean;
+    error?: string;
+  };
+}
+
+export interface NotebookCell {
+  cell_type: 'markdown' | 'code';
+  content: string;
+}

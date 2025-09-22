@@ -9,8 +9,9 @@ import { ModeToggle } from '@/components/ModeToggle';
 import { SearchWithAutocomplete } from '@/components/SearchWithAutocomplete';
 import { DateFilters } from '@/components/DateFilters';
 import { DataSidebar } from '@/components/DataSidebar';
-import { IframeContainer } from '@/components/IframeContainer';
-import { AssignmentData, ParsedData, FilterState, SidebarItem } from '@/types/data';
+import { NotebookRenderer } from '@/components/NotebookRenderer';
+import { AssignmentData, ParsedData, FilterState, SidebarItem, NotebookData, NotebookCell } from '@/types/data';
+import { extractFileIdFromUrl, downloadNotebook } from '@/utils/notebookDownloader';
 import { toast } from '@/hooks/use-toast';
 import heroImage from '@/assets/hero-dashboard.jpg';
 
@@ -34,6 +35,12 @@ const Index = () => {
   });
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [selectedData, setSelectedData] = useState<ParsedData | null>(null);
+  const [notebookData, setNotebookData] = useState<NotebookData>({});
+  const [currentNotebook, setCurrentNotebook] = useState<{
+    cells: NotebookCell[];
+    isLoading: boolean;
+    error?: string;
+  } | null>(null);
 
   const parseExcelFile = useCallback(async (file: File) => {
     setIsProcessing(true);
@@ -126,12 +133,15 @@ const Index = () => {
     });
     setSelectedItem(null);
     setSelectedData(null);
+    setNotebookData({});
+    setCurrentNotebook(null);
   }, []);
 
   const handleApplyFilters = useCallback(() => {
     setAppliedFilters({ ...filters });
     setSelectedItem(null);
     setSelectedData(null);
+    setCurrentNotebook(null);
   }, [filters]);
 
   const filteredData = useMemo(() => {
@@ -165,10 +175,51 @@ const Index = () => {
     }));
   }, [filteredData, appliedFilters.mode]);
 
-  const handleItemSelect = useCallback((item: SidebarItem) => {
+  const handleItemSelect = useCallback(async (item: SidebarItem) => {
     setSelectedItem(item.id);
     setSelectedData(item.data);
-  }, []);
+
+    // Check if we already have this notebook data
+    const notebookId = `${item.data.fullName}-${item.data.title}`;
+    if (notebookData[notebookId]) {
+      setCurrentNotebook(notebookData[notebookId]);
+      return;
+    }
+
+    // Extract file ID from the share URL
+    const fileId = extractFileIdFromUrl(item.data.share);
+    if (!fileId) {
+      setCurrentNotebook({
+        cells: [],
+        isLoading: false,
+        error: "Invalid Google Colab URL - cannot extract file ID"
+      });
+      return;
+    }
+
+    // Set loading state
+    const loadingState = { cells: [], isLoading: true };
+    setCurrentNotebook(loadingState);
+    setNotebookData(prev => ({ ...prev, [notebookId]: loadingState }));
+
+    try {
+      // Download and parse the notebook
+      const cells = await downloadNotebook(fileId);
+      const successState = { cells, isLoading: false };
+      
+      setCurrentNotebook(successState);
+      setNotebookData(prev => ({ ...prev, [notebookId]: successState }));
+    } catch (error) {
+      const errorState = {
+        cells: [],
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to download notebook'
+      };
+      
+      setCurrentNotebook(errorState);
+      setNotebookData(prev => ({ ...prev, [notebookId]: errorState }));
+    }
+  }, [notebookData]);
 
   const hasData = rawData.length > 0;
   const hasAppliedFilters = appliedFilters.selectedOption !== '';
@@ -261,9 +312,15 @@ const Index = () => {
                   />
                 </div>
                 
-                {/* Iframe Container */}
+                {/* Notebook Renderer */}
                 <div className="lg:col-span-2">
-                  <IframeContainer selectedData={selectedData} />
+                  <NotebookRenderer 
+                    cells={currentNotebook?.cells || []}
+                    isLoading={currentNotebook?.isLoading || false}
+                    error={currentNotebook?.error}
+                    studentName={selectedData?.fullName}
+                    assignmentTitle={selectedData?.title}
+                  />
                 </div>
               </div>
             </div>
