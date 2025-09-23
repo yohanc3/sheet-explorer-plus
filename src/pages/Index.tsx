@@ -1,35 +1,45 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Filter, Download } from 'lucide-react';
-import { FileUpload } from '@/components/FileUpload';
-import { ModeToggle } from '@/components/ModeToggle';
-import { SearchWithAutocomplete } from '@/components/SearchWithAutocomplete';
-import { DateFilters } from '@/components/DateFilters';
-import { DataSidebar } from '@/components/DataSidebar';
-import { NotebookRenderer } from '@/components/NotebookRenderer';
-import { AssignmentData, ParsedData, FilterState, SidebarItem, NotebookData, NotebookCell } from '@/types/data';
-import { extractFileIdFromUrl, downloadNotebook } from '@/utils/notebookDownloader';
-import { toast } from '@/hooks/use-toast';
-import heroImage from '@/assets/hero-dashboard.jpg';
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import * as XLSX from "xlsx";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Filter, Download } from "lucide-react";
+import { FileUpload } from "@/components/FileUpload";
+import { ModeToggle } from "@/components/ModeToggle";
+import { SearchWithAutocomplete } from "@/components/SearchWithAutocomplete";
+import { DateFilters } from "@/components/DateFilters";
+import { DataSidebar } from "@/components/DataSidebar";
+import { NotebookRenderer } from "@/components/NotebookRenderer";
+import {
+  AssignmentData,
+  ParsedData,
+  FilterState,
+  SidebarItem,
+  NotebookData,
+  NotebookCell,
+} from "@/types/data";
+import {
+  extractFileIdFromUrl,
+  downloadNotebook,
+} from "@/utils/notebookDownloader";
+import { toast } from "@/hooks/use-toast";
+import heroImage from "@/assets/hero-dashboard.jpg";
 
 const Index = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [rawData, setRawData] = useState<ParsedData[]>([]);
   const [filters, setFilters] = useState<FilterState>({
-    mode: 'student',
-    searchQuery: '',
-    selectedOption: '',
+    mode: "student",
+    searchQuery: "",
+    selectedOption: "",
     startDate: undefined,
     endDate: undefined,
   });
   const [appliedFilters, setAppliedFilters] = useState<FilterState>({
-    mode: 'student',
-    searchQuery: '',
-    selectedOption: '',
+    mode: "student",
+    searchQuery: "",
+    selectedOption: "",
     startDate: undefined,
     endDate: undefined,
   });
@@ -46,11 +56,11 @@ const Index = () => {
     setIsProcessing(true);
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      const workbook = XLSX.read(buffer, { type: "array" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData: AssignmentData[] = XLSX.utils.sheet_to_json(worksheet);
-      
+
       const parsedData: ParsedData[] = jsonData.map((row, index) => {
         // Handle different timestamp formats
         let timestamp: Date;
@@ -77,18 +87,18 @@ const Index = () => {
         return {
           ...row,
           timestamp,
-          fullName: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
-          title: row.title || '',
-          first_name: row.first_name || '',
-          last_name: row.last_name || '',
-          time: row.time || '',
-          difficulty: row.difficulty || '',
-          confident: row.confident || '',
-          needswork: row.needswork || '',
-          suggestions: row.suggestions || '',
-          corrections: row.corrections || '',
-          locals: row.locals || '',
-          share: row.share || '',
+          fullName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+          title: row.title || "",
+          first_name: row.first_name || "",
+          last_name: row.last_name || "",
+          time: row.time || "",
+          difficulty: row.difficulty || "",
+          confident: row.confident || "",
+          needswork: row.needswork || "",
+          suggestions: row.suggestions || "",
+          corrections: row.corrections || "",
+          locals: row.locals || "",
+          share: row.share || "",
         };
       });
 
@@ -98,10 +108,11 @@ const Index = () => {
         description: `Loaded ${parsedData.length} assignment records`,
       });
     } catch (error) {
-      console.error('Error processing file:', error);
+      console.error("Error processing file:", error);
       toast({
         title: "Processing Error",
-        description: "Failed to process the Excel file. Please check the format.",
+        description:
+          "Failed to process the Excel file. Please check the format.",
         variant: "destructive",
       });
     } finally {
@@ -109,25 +120,28 @@ const Index = () => {
     }
   }, []);
 
-  const handleFileUpload = useCallback((file: File) => {
-    setUploadedFile(file);
-    parseExcelFile(file);
-  }, [parseExcelFile]);
+  const handleFileUpload = useCallback(
+    (file: File) => {
+      setUploadedFile(file);
+      parseExcelFile(file);
+    },
+    [parseExcelFile]
+  );
 
   const handleClearFile = useCallback(() => {
     setUploadedFile(null);
     setRawData([]);
     setFilters({
-      mode: 'student',
-      searchQuery: '',
-      selectedOption: '',
+      mode: "student",
+      searchQuery: "",
+      selectedOption: "",
       startDate: undefined,
       endDate: undefined,
     });
     setAppliedFilters({
-      mode: 'student',
-      searchQuery: '',
-      selectedOption: '',
+      mode: "student",
+      searchQuery: "",
+      selectedOption: "",
       startDate: undefined,
       endDate: undefined,
     });
@@ -149,18 +163,26 @@ const Index = () => {
 
     // Apply date filters
     if (appliedFilters.startDate) {
-      filtered = filtered.filter(item => item.timestamp >= appliedFilters.startDate!);
+      filtered = filtered.filter(
+        (item) => item.timestamp >= appliedFilters.startDate!
+      );
     }
     if (appliedFilters.endDate) {
-      filtered = filtered.filter(item => item.timestamp <= appliedFilters.endDate!);
+      filtered = filtered.filter(
+        (item) => item.timestamp <= appliedFilters.endDate!
+      );
     }
 
     // Apply selection filter
     if (appliedFilters.selectedOption) {
-      if (appliedFilters.mode === 'student') {
-        filtered = filtered.filter(item => item.fullName === appliedFilters.selectedOption);
+      if (appliedFilters.mode === "student") {
+        filtered = filtered.filter(
+          (item) => item.fullName === appliedFilters.selectedOption
+        );
       } else {
-        filtered = filtered.filter(item => item.title === appliedFilters.selectedOption);
+        filtered = filtered.filter(
+          (item) => item.title === appliedFilters.selectedOption
+        );
       }
     }
 
@@ -170,59 +192,65 @@ const Index = () => {
   const sidebarItems: SidebarItem[] = useMemo(() => {
     return filteredData.map((item, index) => ({
       id: `${appliedFilters.mode}-${index}`,
-      label: appliedFilters.mode === 'student' ? item.title : item.fullName,
+      label: appliedFilters.mode === "student" ? item.title : item.fullName,
       data: item,
     }));
   }, [filteredData, appliedFilters.mode]);
 
-  const handleItemSelect = useCallback(async (item: SidebarItem) => {
-    setSelectedItem(item.id);
-    setSelectedData(item.data);
+  const handleItemSelect = useCallback(
+    async (item: SidebarItem) => {
+      setSelectedItem(item.id);
+      setSelectedData(item.data);
 
-    // Check if we already have this notebook data
-    const notebookId = `${item.data.fullName}-${item.data.title}`;
-    if (notebookData[notebookId]) {
-      setCurrentNotebook(notebookData[notebookId]);
-      return;
-    }
+      // Check if we already have this notebook data
+      const notebookId = `${item.data.fullName}-${item.data.title}`;
+      if (notebookData[notebookId]) {
+        setCurrentNotebook(notebookData[notebookId]);
+        return;
+      }
 
-    // Extract file ID from the share URL
-    const fileId = extractFileIdFromUrl(item.data.share);
-    if (!fileId) {
-      setCurrentNotebook({
-        cells: [],
-        isLoading: false,
-        error: "Invalid Google Colab URL - cannot extract file ID"
-      });
-      return;
-    }
+      // Extract file ID from the share URL
+      const fileId = extractFileIdFromUrl(item.data.share);
+      if (!fileId) {
+        setCurrentNotebook({
+          cells: [],
+          isLoading: false,
+          error: "Invalid Google Colab URL - cannot extract file ID",
+        });
+        return;
+      }
 
-    // Set loading state
-    const loadingState = { cells: [], isLoading: true };
-    setCurrentNotebook(loadingState);
-    setNotebookData(prev => ({ ...prev, [notebookId]: loadingState }));
+      // Set loading state
+      const loadingState = { cells: [], isLoading: true };
+      setCurrentNotebook(loadingState);
+      setNotebookData((prev) => ({ ...prev, [notebookId]: loadingState }));
 
-    try {
-      // Download and parse the notebook
-      const cells = await downloadNotebook(fileId);
-      const successState = { cells, isLoading: false };
-      
-      setCurrentNotebook(successState);
-      setNotebookData(prev => ({ ...prev, [notebookId]: successState }));
-    } catch (error) {
-      const errorState = {
-        cells: [],
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to download notebook'
-      };
-      
-      setCurrentNotebook(errorState);
-      setNotebookData(prev => ({ ...prev, [notebookId]: errorState }));
-    }
-  }, [notebookData]);
+      try {
+        // Download and parse the notebook
+        const cells = await downloadNotebook(fileId);
+        const successState = { cells, isLoading: false };
+
+        setCurrentNotebook(successState);
+        setNotebookData((prev) => ({ ...prev, [notebookId]: successState }));
+      } catch (error) {
+        const errorState = {
+          cells: [],
+          isLoading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to download notebook",
+        };
+
+        setCurrentNotebook(errorState);
+        setNotebookData((prev) => ({ ...prev, [notebookId]: errorState }));
+      }
+    },
+    [notebookData]
+  );
 
   const hasData = rawData.length > 0;
-  const hasAppliedFilters = appliedFilters.selectedOption !== '';
+  const hasAppliedFilters = appliedFilters.selectedOption !== "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -230,19 +258,20 @@ const Index = () => {
       <div className="border-b bg-gradient-to-r from-background to-sidebar-bg">
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center gap-4 mb-6">
-            <img 
-              src={heroImage} 
-              alt="Excel Data Analyzer" 
+            <img
+              src={heroImage}
+              alt="Excel Data Analyzer"
               className="w-16 h-16 rounded-lg object-cover shadow-md"
             />
             <div>
               <h1 className="text-3xl font-bold">Excel Assignment Analyzer</h1>
               <p className="text-muted-foreground">
-                Upload and analyze student assignment data with advanced filtering
+                Upload and analyze student assignment data with advanced
+                filtering
               </p>
             </div>
           </div>
-          
+
           <FileUpload
             onFileUpload={handleFileUpload}
             uploadedFile={uploadedFile}
@@ -260,32 +289,42 @@ const Index = () => {
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <ModeToggle
                   mode={filters.mode}
-                  onChange={(mode) => setFilters(prev => ({ 
-                    ...prev, 
-                    mode, 
-                    searchQuery: '', 
-                    selectedOption: '' 
-                  }))}
+                  onChange={(mode) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      mode,
+                      searchQuery: "",
+                      selectedOption: "",
+                    }))
+                  }
                 />
-                
+
                 <SearchWithAutocomplete
                   data={rawData}
                   mode={filters.mode}
                   searchQuery={filters.searchQuery}
                   selectedOption={filters.selectedOption}
-                  onSearchChange={(query) => setFilters(prev => ({ ...prev, searchQuery: query }))}
-                  onOptionSelect={(option) => setFilters(prev => ({ ...prev, selectedOption: option }))}
+                  onSearchChange={(query) =>
+                    setFilters((prev) => ({ ...prev, searchQuery: query }))
+                  }
+                  onOptionSelect={(option) =>
+                    setFilters((prev) => ({ ...prev, selectedOption: option }))
+                  }
                 />
-                
+
                 <DateFilters
                   startDate={filters.startDate}
                   endDate={filters.endDate}
-                  onStartDateChange={(date) => setFilters(prev => ({ ...prev, startDate: date }))}
-                  onEndDateChange={(date) => setFilters(prev => ({ ...prev, endDate: date }))}
+                  onStartDateChange={(date) =>
+                    setFilters((prev) => ({ ...prev, startDate: date }))
+                  }
+                  onEndDateChange={(date) =>
+                    setFilters((prev) => ({ ...prev, endDate: date }))
+                  }
                 />
-                
+
                 <Card className="p-4 flex items-center">
-                  <Button 
+                  <Button
                     onClick={handleApplyFilters}
                     className="w-full gap-2"
                     disabled={!filters.selectedOption}
@@ -300,10 +339,10 @@ const Index = () => {
 
           {/* Main Content */}
           {hasAppliedFilters && (
-            <div className="container mx-auto px-6 py-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-280px)]">
+            <div className="container mx-auto px-6 py-6 h-[calc(100vh-200px)] flex flex-col">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
                 {/* Sidebar */}
-                <div className="lg:col-span-1">
+                <div className="lg:col-span-1 min-h-0">
                   <DataSidebar
                     items={sidebarItems}
                     mode={appliedFilters.mode}
@@ -311,10 +350,10 @@ const Index = () => {
                     onItemSelect={handleItemSelect}
                   />
                 </div>
-                
+
                 {/* Notebook Renderer */}
-                <div className="lg:col-span-2">
-                  <NotebookRenderer 
+                <div className="lg:col-span-2 min-h-0">
+                  <NotebookRenderer
                     cells={currentNotebook?.cells || []}
                     isLoading={currentNotebook?.isLoading || false}
                     error={currentNotebook?.error}

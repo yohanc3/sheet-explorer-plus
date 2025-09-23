@@ -1,5 +1,5 @@
 export interface NotebookCell {
-  cell_type: 'markdown' | 'code';
+  cell_type: "markdown" | "code";
   content: string;
 }
 
@@ -10,28 +10,27 @@ export function extractFileIdFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
-export async function downloadNotebook(fileId: string): Promise<NotebookCell[]> {
-  const url = `https://drive.google.com/uc?id=${fileId}&export=download`;
-  console.log("Fetching notebook:", url);
-  
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch notebook: ${res.status} ${res.statusText}`
-    );
-  }
-  
-  const content = await res.text();
+export async function downloadNotebook(
+  fileId: string
+): Promise<NotebookCell[]> {
+  const url = `/api/notebook/${fileId}`;
+  console.log("Fetching notebook from backend:", url);
 
-  // Parse JSON
-  let notebook;
-  try {
-    notebook = JSON.parse(content);
-  } catch (err) {
+  const res = await fetch(url);
+  console.log("Response:", res);
+
+  if (!res.ok) {
+    const errorData = await res
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(
-      "Downloaded content is not valid JSON. Maybe the link is restricted?"
+      errorData.error ||
+        `Failed to fetch notebook: ${res.status} ${res.statusText}`
     );
   }
+
+  // The backend already returns parsed JSON
+  const notebook = await res.json();
 
   // Extract cells in the desired format
   const extractedCells: NotebookCell[] = [];
