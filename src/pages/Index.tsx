@@ -45,6 +45,7 @@ const Index = () => {
   });
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [selectedData, setSelectedData] = useState<ParsedData | null>(null);
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [notebookData, setNotebookData] = useState<NotebookData>({});
   const [currentNotebook, setCurrentNotebook] = useState<{
     cells: NotebookCell[];
@@ -84,13 +85,19 @@ const Index = () => {
           timestamp = new Date();
         }
 
+        let first_name = "";
+        let last_name = "";
+        if (typeof row.first_name === "string")
+          first_name = row.first_name.trim();
+        if (typeof row.last_name === "string") last_name = row.last_name.trim();
+
         return {
           ...row,
           timestamp,
-          fullName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+          fullName: `${first_name} ${last_name}`.trim(),
           title: row.title || "",
-          first_name: row.first_name || "",
-          last_name: row.last_name || "",
+          first_name: first_name,
+          last_name: last_name,
           time: row.time || "",
           difficulty: row.difficulty || "",
           confident: row.confident || "",
@@ -147,6 +154,7 @@ const Index = () => {
     });
     setSelectedItem(null);
     setSelectedData(null);
+    setSelectedClass(null);
     setNotebookData({});
     setCurrentNotebook(null);
   }, []);
@@ -157,6 +165,13 @@ const Index = () => {
     setSelectedData(null);
     setCurrentNotebook(null);
   }, [filters]);
+
+  const handleClassSelect = useCallback((classId: string | null) => {
+    setSelectedClass(classId);
+    setSelectedItem(null);
+    setSelectedData(null);
+    setCurrentNotebook(null);
+  }, []);
 
   const filteredData = useMemo(() => {
     let filtered = rawData;
@@ -190,11 +205,47 @@ const Index = () => {
   }, [rawData, appliedFilters]);
 
   const sidebarItems: SidebarItem[] = useMemo(() => {
-    return filteredData.map((item, index) => ({
-      id: `${appliedFilters.mode}-${index}`,
-      label: appliedFilters.mode === "student" ? item.title : item.fullName,
-      data: item,
-    }));
+    if (appliedFilters.mode === "student") {
+      // In student mode, just show assignments normally
+      return filteredData.map((item, index) => ({
+        id: `${appliedFilters.mode}-${index}`,
+        label: item.title,
+        data: item,
+      }));
+    } else {
+      // In assignment mode, group by student name and track attempts
+      const studentGroups: { [fullName: string]: ParsedData[] } = {};
+
+      filteredData.forEach((item) => {
+        if (!studentGroups[item.fullName]) {
+          studentGroups[item.fullName] = [];
+        }
+        studentGroups[item.fullName].push(item);
+      });
+
+      const items: SidebarItem[] = [];
+      Object.entries(studentGroups).forEach(([fullName, attempts]) => {
+        if (attempts.length === 1) {
+          // Single attempt - show normally
+          items.push({
+            id: `assignment-${fullName}-0`,
+            label: fullName,
+            data: attempts[0],
+          });
+        } else {
+          // Multiple attempts - show with attempt numbers
+          attempts.forEach((attempt, index) => {
+            items.push({
+              id: `assignment-${fullName}-${index}`,
+              label: `${fullName} (Attempt ${index + 1})`,
+              data: attempt,
+            });
+          });
+        }
+      });
+
+      return items;
+    }
   }, [filteredData, appliedFilters.mode]);
 
   const handleItemSelect = useCallback(
@@ -339,20 +390,24 @@ const Index = () => {
 
           {/* Main Content */}
           {hasAppliedFilters && (
-            <div className="container mx-auto px-6 py-6 h-[calc(100vh-200px)] flex flex-col">
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
+            <div className="container mx-auto px-6 py-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Sidebar */}
-                <div className="lg:col-span-1 min-h-0">
+                <div className="lg:col-span-1">
                   <DataSidebar
                     items={sidebarItems}
                     mode={appliedFilters.mode}
                     selectedItem={selectedItem}
+                    selectedClass={selectedClass}
                     onItemSelect={handleItemSelect}
+                    onClassSelect={handleClassSelect}
+                    allData={rawData}
+                    selectedAssignment={appliedFilters.selectedOption}
                   />
                 </div>
 
                 {/* Notebook Renderer */}
-                <div className="lg:col-span-2 min-h-0">
+                <div className="lg:col-span-2">
                   <NotebookRenderer
                     cells={currentNotebook?.cells || []}
                     isLoading={currentNotebook?.isLoading || false}

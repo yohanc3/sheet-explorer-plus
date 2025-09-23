@@ -45,6 +45,12 @@ export interface SidebarItem {
   data: ParsedData;
 }
 
+export interface ClassDefinition {
+  id: string;
+  name: string;
+  students: string[];
+}
+
 export interface NotebookData {
   [assignmentId: string]: {
     cells: NotebookCell[];

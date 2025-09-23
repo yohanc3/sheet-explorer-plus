@@ -2,8 +2,21 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, BookOpen, Calendar, Clock } from "lucide-react";
-import { SidebarItem, SearchMode } from "@/types/data";
+import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Users, BookOpen, Calendar, Clock, GraduationCap } from "lucide-react";
+import {
+  SidebarItem,
+  SearchMode,
+  ClassDefinition,
+  ParsedData,
+} from "@/types/data";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -11,18 +24,131 @@ interface DataSidebarProps {
   items: SidebarItem[];
   mode: SearchMode;
   selectedItem: string | null;
+  selectedClass: string | null;
   onItemSelect: (item: SidebarItem) => void;
+  onClassSelect: (classId: string | null) => void;
+  allData?: ParsedData[];
+  selectedAssignment?: string;
 }
+
+const CLASS_DEFINITIONS: ClassDefinition[] = [
+  {
+    id: "cs127-fall2025",
+    name: "CS 127 - Fall 2025",
+    students: [
+      "Laura Mahlum",
+      "Angel Mendez",
+      "Ruby Lipscomb",
+      "Joe Castaneda",
+      "Selina Dai",
+      "Roman Flores",
+      "Layah Glover",
+      "Jaxson Goodrich",
+      "Miles Kallsen",
+      "Zayd Khan",
+      "Anastasia Lamberes",
+      "Edgar Linares",
+      "Nisha Ajana",
+      "Anna Beckman",
+      "Richard Bofeko",
+      "Chris Mueller",
+      "Malika Mukanbaeva",
+      "Bryce Nicolas-Penn",
+      "Nathan Nicolas",
+      "David Pina",
+      "Brookly Pottie",
+      "Alexis Ramirez",
+      "Ahmad Shahroz",
+      "Daniel Smazil",
+      "Javon Smith",
+      "Karl Swanson",
+    ],
+  },
+];
 
 export const DataSidebar: React.FC<DataSidebarProps> = ({
   items,
   mode,
   selectedItem,
+  selectedClass,
   onItemSelect,
+  onClassSelect,
+  allData = [],
+  selectedAssignment,
 }) => {
-  if (items.length === 0) {
+
+  // Filter items based on selected class when in assignment mode
+  const filteredItems = React.useMemo(() => {
+    if (mode !== "assignment" || !selectedClass) {
+      return items;
+    }
+
+    const selectedClassDef = CLASS_DEFINITIONS.find(
+      (c) => c.id === selectedClass
+    );
+    if (!selectedClassDef) {
+      return items;
+    }
+
+    return items.filter((item) =>{
+      if(item.data.fullName.includes("Pina")) {
+        console.log("item data: ", item.data, "is it there?: ", selectedClassDef.students.includes(item.data.fullName))
+      }
+      return selectedClassDef.students.includes(item.data.fullName)
+      }
+    );
+  }, [items, mode, selectedClass]);
+
+  // Find possible matches - students with matching last names but different first names
+  const possibleMatches = React.useMemo(() => {
+    if (mode !== "assignment" || !selectedClass || !selectedAssignment) {
+      return [];
+    }
+
+    const selectedClassDef = CLASS_DEFINITIONS.find(
+      (c) => c.id === selectedClass
+    );
+    if (!selectedClassDef) {
+      return [];
+    }
+
+    // Get last names of students already shown in filteredItems
+    const existingStudentNames = new Set(
+      filteredItems.map((item) => item.data.fullName)
+    );
+
+    // Get last names from the class definition (CS 127 students)
+    const classLastNames = new Set(
+      selectedClassDef.students.map((studentName) => {
+        const parts = studentName.trim().split(" ");
+        return parts[parts.length - 1].toLowerCase(); // Get last name
+      })
+    );
+
+    // Find students in allData with matching assignment + matching last name from class roster + different first name
+    const matches = allData.filter((data) => {
+      // Must have the same assignment
+      if (data.title !== selectedAssignment) return false;
+
+      // Must not already be in the main list
+      if (existingStudentNames.has(data.fullName)) return false;
+
+      // Must have a matching last name with someone in the class roster
+      const dataLastName = data.last_name.toLowerCase();
+      return classLastNames.has(dataLastName);
+    });
+
+    // Convert to SidebarItems
+    return matches.map((data, index) => ({
+      id: `possible-match-${data.fullName}-${index}`,
+      label: `${data.fullName} (Possible match)`,
+      data,
+    }));
+  }, [mode, selectedClass, selectedAssignment, allData, filteredItems]);
+
+  if (filteredItems.length === 0 && possibleMatches.length === 0) {
     return (
-      <div className="h-full flex flex-col">
+      <div className="flex flex-col" style={{ height: "calc(100vh - 2.5rem)" }}>
         <Card className="h-full flex items-center justify-center p-6">
           <div className="text-center text-muted-foreground">
             <div className="mb-4">
@@ -45,27 +171,54 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col" style={{ height: "calc(100vh - 2.5rem)" }}>
       <Card className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 p-4 border-b bg-sidebar-bg">
+        <div className="flex-shrink-0 p-4 border-b bg-sidebar-bg space-y-3">
           <h3 className="font-semibold flex items-center gap-2">
             {mode === "student" ? (
               <>
                 <BookOpen className="h-5 w-5" />
-                Assignments ({items.length})
+                Assignments ({filteredItems.length})
               </>
             ) : (
               <>
                 <Users className="h-5 w-5" />
-                Students ({items.length})
+                Students ({filteredItems.length})
               </>
             )}
           </h3>
+
+          {mode === "assignment" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <GraduationCap className="h-4 w-4" />
+                Filter by Class
+              </div>
+              <Select
+                value={selectedClass || "all"}
+                onValueChange={(value) =>
+                  onClassSelect(value === "all" ? null : value)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All Students" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Students</SelectItem>
+                  {CLASS_DEFINITIONS.map((classDef) => (
+                    <SelectItem key={classDef.id} value={classDef.id}>
+                      {classDef.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
-        <ScrollArea className="flex-1 min-h-0">
+        <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <Button
                 key={item.id}
                 variant="ghost"
@@ -98,6 +251,55 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
                 </div>
               </Button>
             ))}
+
+            {possibleMatches.length > 0 && (
+              <>
+                {filteredItems.length > 0 && (
+                  <div className="px-1 py-2">
+                    <Separator />
+                  </div>
+                )}
+                <div className="px-1 py-2">
+                  <div className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                    <Users className="h-3 w-3" />
+                    Possible matches ({possibleMatches.length})
+                  </div>
+                </div>
+                {possibleMatches.map((item) => (
+                  <Button
+                    key={item.id}
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start h-auto p-3 text-left flex-shrink-0 opacity-75",
+                      selectedItem === item.id &&
+                        "bg-primary/10 text-primary border border-primary/20 opacity-100"
+                    )}
+                    onClick={() => onItemSelect(item)}
+                  >
+                    <div className="w-full">
+                      <div className="font-medium line-clamp-2 mb-1">
+                        {item.label}
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {format(item.data.timestamp, "MMM d, yyyy")}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {item.data.time}
+                        </div>
+                      </div>
+                      {mode === "assignment" && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Difficulty: {item.data.difficulty}
+                        </div>
+                      )}
+                    </div>
+                  </Button>
+                ))}
+              </>
+            )}
           </div>
         </ScrollArea>
       </Card>

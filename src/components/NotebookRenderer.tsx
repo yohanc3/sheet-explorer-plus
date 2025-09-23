@@ -21,7 +21,7 @@ export const NotebookRenderer: React.FC<NotebookRendererProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className="h-full flex flex-col">
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 2.5rem)' }}>
         <Card className="h-full flex items-center justify-center">
           <div className="text-center">
             <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-primary" />
@@ -37,7 +37,7 @@ export const NotebookRenderer: React.FC<NotebookRendererProps> = ({
 
   if (error) {
     return (
-      <div className="h-full flex flex-col">
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 2.5rem)' }}>
         <Card className="h-full flex items-center justify-center p-8">
           <div className="text-center max-w-md">
             <FileText className="h-16 w-16 mx-auto mb-4 text-destructive opacity-50" />
@@ -63,7 +63,7 @@ export const NotebookRenderer: React.FC<NotebookRendererProps> = ({
 
   if (!cells || cells.length === 0) {
     return (
-      <div className="h-full flex flex-col">
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 2.5rem)' }}>
         <Card className="h-full flex items-center justify-center p-8">
           <div className="text-center">
             <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
@@ -83,7 +83,7 @@ export const NotebookRenderer: React.FC<NotebookRendererProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 2.5rem)' }}>
       <Card className="h-full flex flex-col overflow-hidden">
         <div className="flex-shrink-0 h-12 px-4 border-b flex items-center bg-sidebar-bg">
           <div className="flex items-center gap-2 min-w-0">
@@ -94,7 +94,7 @@ export const NotebookRenderer: React.FC<NotebookRendererProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-4">
             {cells.map((cell, index) => (
               <Card key={index} className="p-4 flex-shrink-0">
