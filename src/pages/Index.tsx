@@ -24,6 +24,44 @@ import {
 } from "@/utils/notebookDownloader";
 import { toast } from "@/hooks/use-toast";
 import heroImage from "@/assets/hero-dashboard.jpg";
+import { excelSerialToDate } from "@/lib/utils";
+
+// Class definitions - should match DataSidebar
+const CLASS_DEFINITIONS = [
+  {
+    id: "cs127-fall2025",
+    name: "CS 127 - Fall 2025",
+    students: [
+      "Nisha Ajana",
+      "Anna Beckman",
+      "Richard Bofeko",
+      "Joe Castaneda",
+      "Selina Dai",
+      "Roman Flores",
+      "Layah Glover",
+      "Jaxson Goodrich",
+      "Miles Kallsen",
+      "Zayd Khan",
+      "Anastasia Lamberes",
+      "Edgar Linares",
+      "Ruby Lipscomb",
+      "Laura Mahlum",
+      "Angel Mendez",
+      "Chris Mueller",
+      "Malika Mukanbaeva",
+      "Bryce Nicolas-Penn",
+      "Nathan Nicolas",
+      "David Pina",
+      "Brookly Pottie",
+      "Alexis Ramirez",
+      "Ahmad Shahroz",
+      "Daniel Smazil",
+      "Javon Smith",
+      "Karl Swanson",
+      "Corey Tucker",
+    ],
+  },
+];
 
 const Index = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -64,26 +102,7 @@ const Index = () => {
 
       const parsedData: ParsedData[] = jsonData.map((row, index) => {
         // Handle different timestamp formats
-        let timestamp: Date;
-        try {
-          if (row.timestamp) {
-            const dateStr = row.timestamp.toString();
-            timestamp = new Date(dateStr);
-            if (isNaN(timestamp.getTime())) {
-              // Try parsing MM/DD/YYYY format
-              const parts = dateStr.split(/[\/\s:]/);
-              if (parts.length >= 3) {
-                timestamp = new Date(`${parts[0]}/${parts[1]}/${parts[2]}`);
-              } else {
-                timestamp = new Date();
-              }
-            }
-          } else {
-            timestamp = new Date();
-          }
-        } catch (e) {
-          timestamp = new Date();
-        }
+        const timestamp: Date = excelSerialToDate(row.Timestamp) || new Date();
 
         let first_name = "";
         let last_name = "";
@@ -244,9 +263,30 @@ const Index = () => {
         }
       });
 
+      // Apply the same sorting logic as DataSidebar when a class is selected
+      if (selectedClass && appliedFilters.mode === "assignment") {
+        const selectedClassDef = CLASS_DEFINITIONS.find(
+          (c) => c.id === selectedClass
+        );
+        if (selectedClassDef) {
+          // Filter items by class and sort by class definition order
+          const filteredByClass = items.filter((item) =>
+            selectedClassDef.students.includes(item.data.fullName)
+          );
+
+          const sortedItems = filteredByClass.sort((a, b) => {
+            const indexA = selectedClassDef.students.indexOf(a.data.fullName);
+            const indexB = selectedClassDef.students.indexOf(b.data.fullName);
+            return indexA - indexB;
+          });
+
+          return sortedItems;
+        }
+      }
+
       return items;
     }
-  }, [filteredData, appliedFilters.mode]);
+  }, [filteredData, appliedFilters.mode, selectedClass]);
 
   const handleItemSelect = useCallback(
     async (item: SidebarItem) => {
@@ -299,6 +339,41 @@ const Index = () => {
     },
     [notebookData]
   );
+
+  // Navigation for quick grading
+  const handleNavigatePrevious = useCallback(() => {
+    const currentIndex = sidebarItems.findIndex(
+      (item) => item.id === selectedItem
+    );
+    if (currentIndex > 0) {
+      const previousItem = sidebarItems[currentIndex - 1];
+      handleItemSelect(previousItem);
+    }
+  }, [sidebarItems, selectedItem, handleItemSelect]);
+
+  const handleNavigateNext = useCallback(() => {
+    const currentIndex = sidebarItems.findIndex(
+      (item) => item.id === selectedItem
+    );
+    if (currentIndex < sidebarItems.length - 1) {
+      const nextItem = sidebarItems[currentIndex + 1];
+      handleItemSelect(nextItem);
+    }
+  }, [sidebarItems, selectedItem, handleItemSelect]);
+
+  const canNavigatePrevious = useMemo(() => {
+    const currentIndex = sidebarItems.findIndex(
+      (item) => item.id === selectedItem
+    );
+    return currentIndex > 0;
+  }, [sidebarItems, selectedItem]);
+
+  const canNavigateNext = useMemo(() => {
+    const currentIndex = sidebarItems.findIndex(
+      (item) => item.id === selectedItem
+    );
+    return currentIndex < sidebarItems.length - 1 && currentIndex !== -1;
+  }, [sidebarItems, selectedItem]);
 
   const hasData = rawData.length > 0;
   const hasAppliedFilters = appliedFilters.selectedOption !== "";
@@ -374,15 +449,21 @@ const Index = () => {
                   }
                 />
 
-                <Card className="p-4 flex items-center">
-                  <Button
-                    onClick={handleApplyFilters}
-                    className="w-full gap-2"
-                    disabled={!filters.selectedOption}
-                  >
-                    <Filter className="h-4 w-4" />
-                    Apply Filters
-                  </Button>
+                <Card className="p-4 flex flex-col h-full">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-2 w-2 rounded-full bg-accent"></div>
+                    <label className="text-sm font-medium">Apply Changes</label>
+                  </div>
+                  <div className="flex flex-1 items-center">
+                    <Button
+                      onClick={handleApplyFilters}
+                      className="w-full gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+                      disabled={!filters.selectedOption}
+                    >
+                      <Filter className="h-4 w-4" />
+                      Apply Filters
+                    </Button>
+                  </div>
                 </Card>
               </div>
             </div>
@@ -414,6 +495,11 @@ const Index = () => {
                     error={currentNotebook?.error}
                     studentName={selectedData?.fullName}
                     assignmentTitle={selectedData?.title}
+                    notebookUrl={selectedData?.share}
+                    onNavigatePrevious={handleNavigatePrevious}
+                    onNavigateNext={handleNavigateNext}
+                    canNavigatePrevious={canNavigatePrevious}
+                    canNavigateNext={canNavigateNext}
                   />
                 </div>
               </div>

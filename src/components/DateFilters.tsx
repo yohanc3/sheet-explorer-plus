@@ -21,24 +21,30 @@ export const DateFilters: React.FC<DateFiltersProps> = ({
   onEndDateChange,
 }) => {
   return (
-    <Card className="p-4">
-      <div className="space-y-4">
+    <Card className="p-4 flex flex-col h-full">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-2 w-2 rounded-full bg-accent"></div>
         <label className="text-sm font-medium">Date Range Filter</label>
-        
-        <div className="grid grid-cols-2 gap-4">
+      </div>
+
+      <div className="flex flex-col flex-1 justify-center space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="space-y-2">
             <label className="text-xs text-muted-foreground">Start Date</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
+                  size="sm"
                   className={cn(
                     "w-full justify-start text-left font-normal",
                     !startDate && "text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {startDate ? format(startDate, "PPP") : "Pick a date"}
+                  <span className="truncate">
+                    {startDate ? format(startDate, "MMM d, yyyy") : "Pick date"}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -59,13 +65,16 @@ export const DateFilters: React.FC<DateFiltersProps> = ({
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
+                  size="sm"
                   className={cn(
                     "w-full justify-start text-left font-normal",
                     !endDate && "text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {endDate ? format(endDate, "PPP") : "Pick a date"}
+                  <span className="truncate">
+                    {endDate ? format(endDate, "MMM d, yyyy") : "Pick date"}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">

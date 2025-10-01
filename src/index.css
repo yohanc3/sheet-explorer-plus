@@ -30,8 +30,8 @@ All colors MUST be HSL.
     --muted: 215 16% 97%;
     --muted-foreground: 215 16% 46%;
 
-    /* Accent for highlights */
-    --accent: 142 71% 45%;
+    /* Accent for highlights - warm orange for better contrast */
+    --accent: 25 95% 53%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -97,7 +97,7 @@ All colors MUST be HSL.
     --muted: 215 28% 14%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 142 69% 50%;
+    --accent: 25 95% 58%;
     --accent-foreground: 215 28% 9%;
 
     --destructive: 0 75% 65%;

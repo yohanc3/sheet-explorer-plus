@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,6 +19,7 @@ import {
 } from "@/types/data";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatInTimeZone } from "date-fns-tz";
 
 interface DataSidebarProps {
   items: SidebarItem[];
@@ -36,9 +37,9 @@ const CLASS_DEFINITIONS: ClassDefinition[] = [
     id: "cs127-fall2025",
     name: "CS 127 - Fall 2025",
     students: [
-      "Laura Mahlum",
-      "Angel Mendez",
-      "Ruby Lipscomb",
+      "Nisha Ajana",
+      "Anna Beckman",
+      "Richard Bofeko",
       "Joe Castaneda",
       "Selina Dai",
       "Roman Flores",
@@ -48,9 +49,9 @@ const CLASS_DEFINITIONS: ClassDefinition[] = [
       "Zayd Khan",
       "Anastasia Lamberes",
       "Edgar Linares",
-      "Nisha Ajana",
-      "Anna Beckman",
-      "Richard Bofeko",
+      "Ruby Lipscomb",
+      "Laura Mahlum",
+      "Angel Mendez",
       "Chris Mueller",
       "Malika Mukanbaeva",
       "Bryce Nicolas-Penn",
@@ -62,6 +63,7 @@ const CLASS_DEFINITIONS: ClassDefinition[] = [
       "Daniel Smazil",
       "Javon Smith",
       "Karl Swanson",
+      "Corey Tucker",
     ],
   },
 ];
@@ -76,6 +78,18 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
   allData = [],
   selectedAssignment,
 }) => {
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const selectedButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Scroll to selected item when it changes
+  useEffect(() => {
+    if (selectedButtonRef.current && scrollAreaRef.current) {
+      selectedButtonRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }, [selectedItem]);
 
   // Filter items based on selected class when in assignment mode
   const filteredItems = React.useMemo(() => {
@@ -90,13 +104,16 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
       return items;
     }
 
-    return items.filter((item) =>{
-      if(item.data.fullName.includes("Pina")) {
-        console.log("item data: ", item.data, "is it there?: ", selectedClassDef.students.includes(item.data.fullName))
-      }
-      return selectedClassDef.students.includes(item.data.fullName)
-      }
-    );
+    const filteredByClass = items.filter((item) => {
+      return selectedClassDef.students.includes(item.data.fullName);
+    });
+
+    // Sort by the order in the class definition
+    return filteredByClass.sort((a, b) => {
+      const indexA = selectedClassDef.students.indexOf(a.data.fullName);
+      const indexB = selectedClassDef.students.indexOf(b.data.fullName);
+      return indexA - indexB;
+    });
   }, [items, mode, selectedClass]);
 
   // Find possible matches - students with matching last names but different first names
@@ -216,16 +233,17 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
           )}
         </div>
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1" ref={scrollAreaRef}>
           <div className="p-2 space-y-1">
             {filteredItems.map((item) => (
               <Button
                 key={item.id}
+                ref={selectedItem === item.id ? selectedButtonRef : undefined}
                 variant="ghost"
                 className={cn(
                   "w-full justify-start h-auto p-3 text-left flex-shrink-0",
                   selectedItem === item.id &&
-                    "bg-primary/10 text-primary border border-primary/20"
+                    "bg-accent/10 text-accent border border-accent/30 shadow-sm font-medium"
                 )}
                 onClick={() => onItemSelect(item)}
               >
@@ -236,7 +254,11 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {format(item.data.timestamp, "MMM d, yyyy")}
+                      {formatInTimeZone(
+                        item.data.timestamp,
+                        "America/Chicago",
+                        "MMM d, yyyy h:mma"
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -268,11 +290,12 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
                 {possibleMatches.map((item) => (
                   <Button
                     key={item.id}
+                    ref={selectedItem === item.id ? selectedButtonRef : undefined}
                     variant="ghost"
                     className={cn(
                       "w-full justify-start h-auto p-3 text-left flex-shrink-0 opacity-75",
                       selectedItem === item.id &&
-                        "bg-primary/10 text-primary border border-primary/20 opacity-100"
+                        "bg-accent/10 text-accent border border-accent/30 opacity-100 shadow-sm font-medium"
                     )}
                     onClick={() => onItemSelect(item)}
                   >
@@ -283,7 +306,11 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {format(item.data.timestamp, "MMM d, yyyy")}
+                          {formatInTimeZone(
+                            item.data.timestamp,
+                            "America/Chicago",
+                            "MMM d, yyyy h:mma"
+                          )}
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />

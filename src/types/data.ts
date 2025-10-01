@@ -1,5 +1,5 @@
 export interface AssignmentData {
-  timestamp: string;
+  Timestamp: string;
   title: string;
   first_name: string;
   last_name: string;
@@ -29,7 +29,7 @@ export interface ParsedData {
   fullName: string;
 }
 
-export type SearchMode = 'student' | 'assignment';
+export type SearchMode = "student" | "assignment";
 
 export interface FilterState {
   mode: SearchMode;
@@ -60,6 +60,6 @@ export interface NotebookData {
 }
 
 export interface NotebookCell {
-  cell_type: 'markdown' | 'code';
+  cell_type: "markdown" | "code";
   content: string;
 }
