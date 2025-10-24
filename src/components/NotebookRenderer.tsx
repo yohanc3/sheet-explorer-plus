@@ -10,11 +10,13 @@ import {
   EyeOff,
   Play,
   RotateCcw,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { NotebookCell } from "@/utils/notebookDownloader";
+import { NotebookCell, NotebookOutput, StreamOutput, ErrorOutput } from "@/utils/notebookDownloader";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
@@ -69,6 +71,7 @@ export const NotebookRenderer: React.FC<NotebookRendererProps> = ({
     resolve: (value: string) => void;
     reject: (reason?: any) => void;
   } | null>(null);
+  const [expandedStudentOutputs, setExpandedStudentOutputs] = useState<Set<number>>(new Set());
 
   // Function to get the last code and markdown cells for quick grading
   function getQuickGradingCells(cellArray: NotebookCell[]): NotebookCell[] {
@@ -425,6 +428,51 @@ export const NotebookRenderer: React.FC<NotebookRendererProps> = ({
     }
   };
 
+  // Toggle student output expansion
+  const toggleStudentOutput = (cellIndex: number) => {
+    setExpandedStudentOutputs((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(cellIndex)) {
+        newSet.delete(cellIndex);
+      } else {
+        newSet.add(cellIndex);
+      }
+      return newSet;
+    });
+  };
+
+  // Render student output content
+  const renderStudentOutput = (output: NotebookOutput) => {
+    if (output.output_type === "stream") {
+      const streamOutput = output as StreamOutput;
+      const text = Array.isArray(streamOutput.text)
+        ? streamOutput.text.join("")
+        : streamOutput.text;
+
+      return (
+        <div className="text-sm font-mono whitespace-pre-wrap">
+          {text}
+        </div>
+      );
+    } else if (output.output_type === "error") {
+      const errorOutput = output as ErrorOutput;
+      return (
+        <div className="text-sm font-mono text-destructive">
+          <div className="font-semibold mb-1">
+            {errorOutput.ename}: {errorOutput.evalue}
+          </div>
+          {errorOutput.traceback && errorOutput.traceback.length > 0 && (
+            <div className="whitespace-pre-wrap text-xs">
+              {errorOutput.traceback.join("\n")}
+            </div>
+          )}
+        </div>
+      );
+    }
+    // For other output types (execute_result, display_data), we can add support later
+    return null;
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col" style={{ height: "calc(100vh - 2.5rem)" }}>
@@ -633,6 +681,37 @@ export const NotebookRenderer: React.FC<NotebookRendererProps> = ({
                           {formatContent(cell.content)}
                         </SyntaxHighlighter>
                       </div>
+
+                      {/* Student Submission Output */}
+                      {cell.outputs && cell.outputs.length > 0 && (
+                        <div className="mt-3">
+                          <button
+                            onClick={() => toggleStudentOutput(index)}
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-colors"
+                          >
+                            {expandedStudentOutputs.has(index) ? (
+                              <ChevronDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            )}
+                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                              Student Submission Output ({cell.outputs.length})
+                            </span>
+                          </button>
+
+                          {expandedStudentOutputs.has(index) && (
+                            <div className="mt-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/50 dark:bg-blue-950/10 p-3 max-h-64 overflow-y-auto">
+                              <div className="space-y-2">
+                                {cell.outputs.map((output, outputIndex) => (
+                                  <div key={outputIndex}>
+                                    {renderStudentOutput(output)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Output Display */}
                       {(result || isAutoExecuting || (waitingForInput?.cellIndex === index)) && (

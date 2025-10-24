@@ -1,6 +1,44 @@
+// Output types for notebook cells
+export interface StreamOutput {
+  output_type: "stream";
+  name: "stdout" | "stderr";
+  text: string | string[];
+}
+
+export interface ErrorOutput {
+  output_type: "error";
+  ename: string;
+  evalue: string;
+  traceback: string[];
+}
+
+export interface ExecuteResultOutput {
+  output_type: "execute_result";
+  data: {
+    "text/plain"?: string | string[];
+    [key: string]: any;
+  };
+  execution_count?: number;
+}
+
+export interface DisplayDataOutput {
+  output_type: "display_data";
+  data: {
+    "text/plain"?: string | string[];
+    [key: string]: any;
+  };
+}
+
+export type NotebookOutput =
+  | StreamOutput
+  | ErrorOutput
+  | ExecuteResultOutput
+  | DisplayDataOutput;
+
 export interface NotebookCell {
   cell_type: "markdown" | "code";
   content: string;
+  outputs?: NotebookOutput[];
 }
 
 export function extractFileIdFromUrl(url: string): string | null {
@@ -17,7 +55,6 @@ export async function downloadNotebook(
   console.log("Fetching notebook from backend:", url);
 
   const res = await fetch(url);
-  console.log("Response:", res);
 
   if (!res.ok) {
     const errorData = await res
@@ -31,6 +68,7 @@ export async function downloadNotebook(
 
   // The backend already returns parsed JSON
   const notebook = await res.json();
+  console.log("Response:", notebook);
 
   // Extract cells in the desired format
   const extractedCells: NotebookCell[] = [];
@@ -43,10 +81,21 @@ export async function downloadNotebook(
           ? cell.source.join("")
           : cell.source || "";
 
-        extractedCells.push({
+        const extractedCell: NotebookCell = {
           cell_type: cell.cell_type,
           content: content,
-        });
+        };
+
+        // Include outputs for code cells
+        if (
+          cell.cell_type === "code" &&
+          cell.outputs &&
+          Array.isArray(cell.outputs)
+        ) {
+          extractedCell.outputs = cell.outputs as NotebookOutput[];
+        }
+
+        extractedCells.push(extractedCell);
       }
     }
   }

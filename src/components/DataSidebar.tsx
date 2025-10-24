@@ -21,6 +21,50 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatInTimeZone } from "date-fns-tz";
 
+// Fuzzy name matching utility
+const matchesStudentName = (
+  rosterName: string,
+  submittedFullName: string
+): boolean => {
+  // Common name suffixes to ignore when extracting last name
+  const suffixes = ['jr', 'sr', 'ii', 'iii', 'iv', 'v', 'jr.', 'sr.'];
+
+  // Split both names into parts
+  const rosterParts = rosterName.trim().split(/\s+/);
+  const submittedParts = submittedFullName.trim().split(/\s+/);
+
+  // Need at least first and last name
+  if (rosterParts.length < 2 || submittedParts.length < 2) {
+    return rosterName.toLowerCase() === submittedFullName.toLowerCase();
+  }
+
+  // Helper function to extract last name, ignoring suffixes
+  const getLastName = (parts: string[]): string => {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const part = parts[i].toLowerCase().replace(/[.,]/g, '');
+      if (!suffixes.includes(part)) {
+        return parts[i].toLowerCase();
+      }
+    }
+    return parts[parts.length - 1].toLowerCase();
+  };
+
+  // Extract first and last names from roster
+  const rosterFirstName = rosterParts[0].toLowerCase();
+  const rosterLastName = getLastName(rosterParts);
+
+  // Extract first and last names from submission
+  const submittedFirstName = submittedParts[0].toLowerCase();
+  const submittedLastName = getLastName(submittedParts);
+
+  // Check if roster first name is contained in submitted first name
+  // and roster last name is contained in submitted last name
+  const firstNameMatches = submittedFirstName.includes(rosterFirstName) || rosterFirstName.includes(submittedFirstName);
+  const lastNameMatches = submittedLastName.includes(rosterLastName) || rosterLastName.includes(submittedLastName);
+
+  return firstNameMatches && lastNameMatches;
+};
+
 interface DataSidebarProps {
   items: SidebarItem[];
   mode: SearchMode;
@@ -105,13 +149,23 @@ export const DataSidebar: React.FC<DataSidebarProps> = ({
     }
 
     const filteredByClass = items.filter((item) => {
-      return selectedClassDef.students.includes(item.data.fullName);
+      return selectedClassDef.students.some((rosterName) =>
+        matchesStudentName(rosterName, item.data.fullName)
+      );
     });
 
     // Sort by the order in the class definition
     return filteredByClass.sort((a, b) => {
-      const indexA = selectedClassDef.students.indexOf(a.data.fullName);
-      const indexB = selectedClassDef.students.indexOf(b.data.fullName);
+      // Find the matching roster name for each item
+      const rosterNameA = selectedClassDef.students.find((rosterName) =>
+        matchesStudentName(rosterName, a.data.fullName)
+      );
+      const rosterNameB = selectedClassDef.students.find((rosterName) =>
+        matchesStudentName(rosterName, b.data.fullName)
+      );
+
+      const indexA = rosterNameA ? selectedClassDef.students.indexOf(rosterNameA) : -1;
+      const indexB = rosterNameB ? selectedClassDef.students.indexOf(rosterNameB) : -1;
       return indexA - indexB;
     });
   }, [items, mode, selectedClass]);

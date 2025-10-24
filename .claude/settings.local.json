@@ -6,7 +6,13 @@
       "Bash(curl:*)",
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(npm run server:*)",
+      "Bash(lsof:*)",
+      "Bash(timeout 5 npm run server)",
+      "Bash(echo:*)",
+      "Bash(rm:*)",
+      "Bash(pnpm install:*)"
     ],
     "deny": [],
     "ask": []
