@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Submission Desk</title>
+  <meta name="description" content="Review student notebook submissions by class and assignment.">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-group">
+      <a class="brand" href="/" aria-label="Submission Desk home"><span class="brand-mark">SD</span><span>Submission Desk</span></a>
+      <div id="workbook-summary" class="workbook-summary"><span></span>No workbook loaded</div>
+    </div>
+    <div class="header-actions">
+      <button id="import-trigger" class="button primary">Import workbook</button>
+      <input id="workbook" type="file" accept=".xlsx" hidden>
+      <button id="manage-classes" class="button secondary">Manage classes</button>
+    </div>
+  </header>
+  <div id="import-progress" class="import-progress" hidden>
+    <div id="import-progress-bar" class="import-progress-bar"></div>
+    <span id="import-progress-text">Uploading workbook…</span>
+  </div>
+
+  <main class="workspace">
+    <aside class="filters">
+      <div class="rail-intro"><div class="eyebrow">Grading workspace</div><h2>Review submissions</h2></div>
+      <div class="segmented" role="group" aria-label="Review mode">
+        <button class="active" data-mode="assignment">By assignment</button>
+        <button data-mode="student">By student</button>
+      </div>
+      <section class="scope-card" aria-labelledby="scope-heading">
+        <div id="scope-heading" class="section-label">1 · Choose scope</div>
+        <label>Class<select id="class-filter"><option value="">All students</option></select></label>
+        <label id="assignment-wrap">Assignment<select id="assignment-filter"><option value="">Choose an assignment</option></select></label>
+        <label id="student-wrap" hidden>Student<select id="student-filter"><option value="">Choose a student</option></select></label>
+        <details class="more-filters"><summary>More filters</summary>
+          <div class="date-grid"><label>From<input id="date-from" type="date"></label><label>Through<input id="date-to" type="date"></label></div>
+          <label>Search<input id="search" type="search" placeholder="Name or assignment"></label>
+        </details>
+      </section>
+      <div class="queue-heading"><span class="section-label">2 · Select submission</span><span id="submission-count" class="count">0</span></div>
+      <div id="queue" class="queue" aria-live="polite"></div>
+    </aside>
+
+    <section id="viewer" class="viewer">
+      <div id="empty-state" class="empty-state">
+        <div id="empty-step" class="empty-step">Get started</div>
+        <div id="empty-icon" class="empty-icon">01</div>
+        <h1 id="empty-title">Import a workbook</h1>
+        <p id="empty-message">Load the master submissions spreadsheet to begin grading.</p>
+        <div id="empty-actions"><button class="button primary" data-import>Choose .xlsx file</button></div>
+      </div>
+      <div id="notebook-view" hidden>
+        <div class="notebook-toolbar">
+          <div><div id="student-name" class="eyebrow"></div><h1 id="assignment-title"></h1><div id="submission-meta" class="meta"></div></div>
+          <div class="toolbar-actions">
+            <label class="toggle"><input id="quick-grade" type="checkbox"><span>Quick grade</span></label>
+            <label class="toggle"><input id="show-all" type="checkbox"><span>Show submission cells</span></label>
+            <a id="open-colab" class="button secondary" target="_blank" rel="noopener">Open in Colab ↗</a>
+          </div>
+        </div>
+        <div class="pager"><button id="previous" class="button secondary">← Previous</button><span id="position"></span><button id="next" class="button secondary">Next →</button></div>
+        <dl id="submission-details" class="submission-details"></dl>
+        <div id="notebook-status" class="status"></div>
+        <div id="cells" class="cells"></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="classes-dialog">
+    <div class="dialog-header"><div><div class="eyebrow">Roster setup</div><h2>Manage classes</h2></div><button class="icon-button" data-close aria-label="Close">×</button></div>
+    <p class="dialog-copy">Create a class, then add students from names found in the imported workbook. You can still type a name manually.</p>
+    <form id="new-class" class="inline-form"><input name="name" required placeholder="Class name, e.g. CS 127 — Fall 2026"><button class="button primary">Add class</button></form>
+    <div id="class-list" class="class-list"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>

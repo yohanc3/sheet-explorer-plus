@@ -1,73 +1,61 @@
-# Welcome to your Lovable project
+# Submission Desk
 
-## Project info
+A local Flask app for reviewing student Google Colab/Jupyter notebook submissions from a master Excel workbook. Classes and rosters are stored in SQLite and start empty—there are no hard-coded students.
 
-**URL**: https://lovable.dev/projects/9484ac96-5573-44e1-90e3-95b6755190b7
+## Local setup
 
-## How can I edit this code?
+Clone the project for the first time:
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/9484ac96-5573-44e1-90e3-95b6755190b7) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+git clone https://github.com/yohanc3/sheet-explorer-plus.git
+cd sheet-explorer-plus
 ```
 
-**Edit a file directly in GitHub**
+If the project is already cloned, update it:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+cd sheet-explorer-plus
+git pull origin main
+```
 
-**Use GitHub Codespaces**
+Create the Python environment and install the dependencies:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+python3 app.py
+```
 
-## What technologies are used for this project?
+Open <http://127.0.0.1:8000>.
 
-This project is built with:
+On later runs, activate the existing environment and start the app:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+source .venv/bin/activate
+python3 app.py
+```
 
-## How can I deploy this project?
+Stop the app with `Ctrl+C`.
 
-Simply open [Lovable](https://lovable.dev/projects/9484ac96-5573-44e1-90e3-95b6755190b7) and click on Share -> Publish.
+## Push changes to main
 
-## Can I connect a custom domain to my Lovable project?
+Before pushing, pull the latest changes:
 
-Yes, you can!
+```bash
+git pull --rebase origin main
+git add .
+git commit -m "Describe the change"
+git push origin main
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Workflow
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+1. Open **Manage classes**, add a class, and add its students by full name.
+2. Import the master `.xlsx` file. Its first worksheet must include `title`, `first_name`, `last_name`, and `share` columns. Existing submission rows are replaced; classes are kept.
+3. Choose an assignment and optionally a class. The queue shows only that class roster, in roster order.
+4. Select a student to load their shared Colab notebook. You can inspect saved outputs, run code locally, open the original notebook in Colab, or use Quick grade with the arrow keys.
+
+Application data is saved in `data/sheet_explorer.db`. Set `SHEET_EXPLORER_DB` to use another database path.
+
+> Python execution runs student code on the local machine. Use this only with submissions you trust or run the app in an isolated environment.

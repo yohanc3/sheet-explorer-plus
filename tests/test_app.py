@@ -1,0 +1,72 @@
+import io
+import tempfile
+import unittest
+from pathlib import Path
+
+from openpyxl import Workbook
+
+import app as application
+
+
+class AppTestCase(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        application.DATABASE = Path(self.temp_dir.name) / "test.db"
+        application.init_db()
+        application.app.config.update(TESTING=True)
+        self.client = application.app.test_client()
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_class_and_student_crud(self):
+        created = self.client.post("/api/classes", json={"name": "CS 127"})
+        self.assertEqual(created.status_code, 201)
+        class_id = created.get_json()["id"]
+        student = self.client.post(f"/api/classes/{class_id}/students", json={"name": "Ada Lovelace"})
+        self.assertEqual(student.status_code, 201)
+        student_id = student.get_json()["id"]
+
+        state = self.client.get("/api/state").get_json()
+        self.assertEqual(state["classes"][0]["students"][0]["name"], "Ada Lovelace")
+        self.assertEqual(self.client.patch(f"/api/students/{student_id}", json={"name": "Augusta Lovelace"}).status_code, 200)
+        self.assertEqual(self.client.delete(f"/api/classes/{class_id}").status_code, 204)
+        self.assertEqual(self.client.get("/api/state").get_json()["classes"], [])
+
+    def test_xlsx_import_replaces_submissions(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Timestamp", "title", "first_name", "last_name", "time", "difficulty", "confident", "needswork", "suggestions", "corrections", "locals", "share"])
+        sheet.append(["8/25/2021 13:15:35", "01.0.0 Intro to the Course", "Justin", "Bruso", "30 min or less", "Very Easy", "Running the code", "The syntax of python", "None", "N/A", 26, "Open submission"])
+        sheet["L2"].hyperlink = "https://colab.research.google.com/drive/1tw6sWATzkK6kZB3msBVZUojB9koL_fDa?usp=sharing"
+        data = io.BytesIO()
+        workbook.save(data)
+        data.seek(0)
+
+        response = self.client.post(
+            "/api/import",
+            data={"file": (data, "submissions.xlsx")},
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(response.status_code, 200)
+        state = self.client.get("/api/state").get_json()
+        self.assertEqual(len(state["submissions"]), 1)
+        submission = state["submissions"][0]
+        self.assertEqual(submission["full_name"], "Justin Bruso")
+        self.assertEqual(submission["timestamp"], "2021-08-25T13:15:35")
+        self.assertEqual(submission["time"], "30 min or less")
+        self.assertEqual(submission["share"], "https://colab.research.google.com/drive/1tw6sWATzkK6kZB3msBVZUojB9koL_fDa?usp=sharing")
+
+    def test_resolve_colab_url_and_execute_python(self):
+        response = self.client.post(
+            "/api/resolve-notebook",
+            json={"url": "https://colab.research.google.com/drive/abcdefghij12345?usp=sharing"},
+        )
+        self.assertEqual(response.get_json()["file_id"], "abcdefghij12345")
+        executed = self.client.post("/api/execute-python", json={"code": "print(6 * 7)"})
+        self.assertEqual(executed.status_code, 200)
+        self.assertEqual(executed.get_json()["output"].strip(), "42")
+
+
+if __name__ == "__main__":
+    unittest.main()
