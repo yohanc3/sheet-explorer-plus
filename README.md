@@ -7,7 +7,7 @@ A local Flask app for reviewing student Google Colab/Jupyter notebook submission
 Clone the project for the first time:
 
 ```bash
-git clone https://github.com/yohanc3/sheet-explorer-plus.git
+git clone git@github.com:yohanc3/sheet-explorer-plus.git
 cd sheet-explorer-plus
 ```
 
@@ -15,6 +15,7 @@ If the project is already cloned, update it:
 
 ```bash
 cd sheet-explorer-plus
+git remote set-url origin git@github.com:yohanc3/sheet-explorer-plus.git
 git pull origin main
 ```
 
