@@ -1,64 +1,54 @@
 # Submission Desk
 
-A local Flask app for reviewing student Google Colab/Jupyter notebook submissions from a public master Google Sheet. The app downloads the latest submissions automatically whenever the page opens. Classes and rosters are stored in SQLite and start empty—there are no hard-coded students.
+A Flask app for reviewing and running student Google Colab/Jupyter submissions from a master Google Sheet. It supports class rosters, assignment queues, per-cell output, and sequential **Run all** execution.
 
-## Local setup
+Hosted at [iwucsgrader.site](https://iwucsgrader.site).
 
-Clone the project for the first time:
+## Run locally
 
 ```bash
 git clone git@github.com:yohanc3/sheet-explorer-plus.git
 cd sheet-explorer-plus
-```
-
-If the project is already cloned, update it:
-
-```bash
-cd sheet-explorer-plus
-git remote set-url origin git@github.com:yohanc3/sheet-explorer-plus.git
-git pull origin main
-```
-
-Create the Python environment and install the dependencies:
-
-```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 python3 app.py
 ```
 
-Open <http://127.0.0.1:8000>.
-
-On later runs, activate the existing environment and start the app:
+Open <http://127.0.0.1:8000>. On later runs:
 
 ```bash
+git pull origin main
 source .venv/bin/activate
 python3 app.py
 ```
 
-Stop the app with `Ctrl+C`.
+## Use
 
-## Push changes to main
+1. Create a class and add students in **Manage classes**.
+2. Let the app fetch the latest public sheet, or import an `.xlsx` file.
+3. Choose an assignment, class, and student.
+4. Review cells individually or select **Run all**.
 
-Before pushing, pull the latest changes:
+Data is stored in `data/sheet_explorer.db`. Override it with `SHEET_EXPLORER_DB`, or change the sheet with `MASTER_SHEET_EXPORT_URL`.
 
-```bash
-git pull --rebase origin main
-git add .
-git commit -m "Describe the change"
-git push origin main
+> Student code executes on the host machine. Only run trusted submissions or use an isolated environment.
+
+## Architecture
+
+### 1. How it works
+
+The browser calls the Flask API. Flask downloads and parses the master sheet, stores classes in SQLite, retrieves shared notebooks, and sends code to a separate notebook process. In production, Nginx provides HTTPS and authentication while Gunicorn runs Flask.
+
+### 2. Diagram
+
+```mermaid
+flowchart LR
+    U[Grader browser] --> N[Nginx + HTTPS]
+    N --> F[Gunicorn + Flask]
+    F --> S[Google Sheet]
+    F --> C[Colab notebooks]
+    F <--> D[(SQLite)]
+    F --> R[Notebook runner]
+    R --> F --> U
 ```
-
-## Workflow
-
-1. Open **Manage classes**, add a class, and add its students by full name.
-2. Open or refresh the app. It automatically downloads the latest rows from the configured public master Google Sheet. Use **Refresh submissions** to check again at any time. **Import file** remains available as a manual `.xlsx` fallback.
-3. Choose an assignment and optionally a class. The queue shows only that class roster, in roster order.
-4. Select a student to load their shared Colab notebook. Use **Run all** to execute every code cell sequentially in one Python kernel, with each result displayed under its source cell. You can also run an individual cell, inspect saved outputs, open the original notebook in Colab, or use Quick grade with the arrow keys.
-
-Application data is saved in `data/sheet_explorer.db`. Set `SHEET_EXPLORER_DB` to use another database path.
-
-The default master-sheet export URL points to the public course sheet. Set `MASTER_SHEET_EXPORT_URL` to a Google Sheets CSV export URL if a different sheet is needed.
-
-> Python execution runs student code on the local machine. Use this only with submissions you trust or run the app in an isolated environment.
