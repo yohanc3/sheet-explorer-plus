@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
@@ -104,6 +105,47 @@ def clean(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def display_student_name(value: Any) -> str:
+    """Preserve a student's spelling while removing invisible/duplicate spacing."""
+    return " ".join(unicodedata.normalize("NFKC", clean(value)).split())
+
+
+def student_name_key(value: Any) -> str:
+    """Return the stable identity used to group a student's submissions."""
+    return display_student_name(value).casefold()
+
+
+def canonicalize_submission_names(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
+    submissions = [dict(row) for row in rows]
+    variants: dict[str, dict[str, list[int]]] = {}
+
+    # Rows arrive newest first. Prefer a spelling with readable capitalization,
+    # then frequency and recency, without rewriting names such as McDonald.
+    for index, submission in enumerate(submissions):
+        display_name = display_student_name(submission["full_name"])
+        key = student_name_key(display_name)
+        entry = variants.setdefault(key, {}).setdefault(display_name, [0, index])
+        entry[0] += 1
+
+    canonical: dict[str, str] = {}
+    for key, spellings in variants.items():
+        canonical[key] = max(
+            spellings,
+            key=lambda name: (
+                sum(word[:1].isupper() for word in name.split()),
+                not name.isupper(),
+                spellings[name][0],
+                -spellings[name][1],
+            ),
+        )
+
+    for submission in submissions:
+        key = student_name_key(submission["full_name"])
+        submission["student_key"] = key
+        submission["full_name"] = canonical.get(key, display_student_name(submission["full_name"]))
+    return submissions
 
 
 def timestamp_value(value: Any, epoch: Any) -> str:
@@ -234,7 +276,8 @@ def index():
 @app.get("/api/state")
 def state():
     with db() as connection:
-        submissions = [dict(row) for row in connection.execute("SELECT * FROM submissions ORDER BY timestamp DESC, id DESC")]
+        rows = connection.execute("SELECT * FROM submissions ORDER BY timestamp DESC, id DESC").fetchall()
+        submissions = canonicalize_submission_names(rows)
         return jsonify({"classes": all_classes(connection), "submissions": submissions})
 
 
@@ -328,7 +371,7 @@ def delete_class(class_id: int):
 
 @app.post("/api/classes/<int:class_id>/students")
 def add_student(class_id: int):
-    name = clean((request.get_json(silent=True) or {}).get("name"))
+    name = display_student_name((request.get_json(silent=True) or {}).get("name"))
     if not name:
         return jsonify(error="Student name is required."), 400
     try:
@@ -349,7 +392,7 @@ def add_student(class_id: int):
 
 @app.patch("/api/students/<int:student_id>")
 def rename_student(student_id: int):
-    name = clean((request.get_json(silent=True) or {}).get("name"))
+    name = display_student_name((request.get_json(silent=True) or {}).get("name"))
     if not name:
         return jsonify(error="Student name is required."), 400
     try:

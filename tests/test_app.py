@@ -101,6 +101,25 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(len(submissions), 1)
         self.assertEqual(submissions[0]["title"], "Saved assignment")
 
+    def test_state_groups_case_and_spacing_variants_of_student_names(self):
+        with application.db() as connection:
+            connection.executemany(
+                """INSERT INTO submissions
+                (timestamp, title, first_name, last_name, full_name, share)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                [
+                    ("2026-09-03T12:00:00", "Assignment 3", "yohance", "smith", "yohance smith", "third"),
+                    ("2026-09-02T12:00:00", "Assignment 2", "yohance", "smith", "yohance   smith", "second"),
+                    ("2026-09-01T12:00:00", "Assignment 1", "Yohance", "Smith", "Yohance Smith", "first"),
+                ],
+            )
+
+        submissions = self.client.get("/api/state").get_json()["submissions"]
+
+        self.assertEqual({item["student_key"] for item in submissions}, {"yohance smith"})
+        self.assertEqual({item["full_name"] for item in submissions}, {"Yohance Smith"})
+        self.assertEqual({item["title"] for item in submissions}, {"Assignment 1", "Assignment 2", "Assignment 3"})
+
     def test_resolve_colab_url_and_execute_python(self):
         response = self.client.post(
             "/api/resolve-notebook",

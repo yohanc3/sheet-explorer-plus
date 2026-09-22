@@ -19,15 +19,28 @@ async function api(url, options = {}) {
   return data;
 }
 
+function studentKey(name) {
+  return String(name || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+function studentName(submission) { return String(submission.full_name || "").trim().replace(/\s+/g, " "); }
+function uniqueStudentNames(submissions) {
+  const students = new Map();
+  for (const submission of submissions) {
+    const key = submission.student_key || studentKey(submission.full_name);
+    if (key && !students.has(key)) students.set(key, studentName(submission));
+  }
+  return [...students.values()].sort((a, b) => a.localeCompare(b));
+}
+function sameStudent(left, right) { return studentKey(left) === studentKey(right); }
 function nameParts(name) {
   const suffixes = new Set(["jr", "sr", "ii", "iii", "iv", "v"]);
-  const parts = name.trim().toLowerCase().split(/\s+/).map(part => part.replace(/[.,]/g, ""));
+  const parts = studentKey(name).split(/\s+/).map(part => part.replace(/[.,]/g, ""));
   const last = [...parts].reverse().find(part => !suffixes.has(part)) || "";
   return { first: parts[0] || "", last };
 }
 function namesMatch(roster, submitted) {
   const a = nameParts(roster), b = nameParts(submitted);
-  if (!a.first || !a.last || !b.first || !b.last) return roster.trim().toLowerCase() === submitted.trim().toLowerCase();
+  if (!a.first || !a.last || !b.first || !b.last) return sameStudent(roster, submitted);
   return (a.first.includes(b.first) || b.first.includes(a.first)) && (a.last.includes(b.last) || b.last.includes(a.last));
 }
 function selectedClass() { return state.classes.find(item => String(item.id) === String(state.classId)); }
@@ -56,7 +69,7 @@ function renderFilters() {
   const classSelect = $("#class-filter");
   classSelect.innerHTML = `<option value="">All students</option>` + state.classes.map(item => `<option value="${item.id}"${String(item.id) === String(state.classId) ? " selected" : ""}>${escapeHtml(item.name)}</option>`).join("");
   fillSelect($("#assignment-filter"), unique(state.submissions.map(item => item.title)), "Choose an assignment", state.assignment);
-  fillSelect($("#student-filter"), unique(state.submissions.filter(inSelectedClass).map(item => item.full_name)), "Choose a student", state.student);
+  fillSelect($("#student-filter"), uniqueStudentNames(state.submissions.filter(inSelectedClass)), "Choose a student", state.student);
   $("#assignment-wrap").hidden = state.mode !== "assignment";
   $("#student-wrap").hidden = state.mode !== "student";
   document.querySelectorAll("[data-mode]").forEach(button => button.classList.toggle("active", button.dataset.mode === state.mode));
@@ -114,10 +127,13 @@ function buildQueue() {
   if (state.mode === "assignment") {
     items = state.assignment ? items.filter(item => item.title === state.assignment) : [];
     const latest = new Map();
-    for (const item of items) if (!latest.has(item.full_name)) latest.set(item.full_name, item);
+    for (const item of items) {
+      const key = item.student_key || studentKey(item.full_name);
+      if (!latest.has(key)) latest.set(key, item);
+    }
     items = [...latest.values()].sort((a, b) => rosterPosition(a) - rosterPosition(b) || a.full_name.localeCompare(b.full_name));
   } else {
-    items = state.student ? items.filter(item => item.full_name === state.student) : [];
+    items = state.student ? items.filter(item => sameStudent(item.full_name, state.student)) : [];
     items.sort((a, b) => a.title.localeCompare(b.title) || String(b.timestamp).localeCompare(String(a.timestamp)));
   }
   if (state.query) {
@@ -286,8 +302,8 @@ async function refresh() {
   state.submissions = data.submissions;
   const assignments = unique(state.submissions.map(item => item.title));
   if (!assignments.includes(state.assignment)) state.assignment = assignments[0] || "";
-  const students = unique(state.submissions.filter(inSelectedClass).map(item => item.full_name));
-  if (state.student && !students.includes(state.student)) state.student = "";
+  const students = uniqueStudentNames(state.submissions.filter(inSelectedClass));
+  if (state.student && !students.some(name => sameStudent(name, state.student))) state.student = "";
   render();
 }
 
@@ -308,11 +324,11 @@ function fuzzyScore(candidate, query) {
 function showStudentSuggestions(input) {
   const card = input.closest("[data-class]");
   const klass = state.classes.find(item => String(item.id) === card.dataset.class);
-  const names = unique(state.submissions.map(item => item.full_name)).filter(name => !klass.students.some(student => namesMatch(student.name, name)));
+  const names = uniqueStudentNames(state.submissions).filter(name => !klass.students.some(student => namesMatch(student.name, name)));
   const matches = names.map(name => ({name, score: fuzzyScore(name, input.value)})).filter(item => Number.isFinite(item.score)).sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
   const suggestions = input.parentElement.querySelector(".student-suggestions");
   suggestions.innerHTML = matches.length ? matches.map(item => {
-    const count = state.submissions.filter(submission => submission.full_name === item.name).length;
+    const count = state.submissions.filter(submission => sameStudent(submission.full_name, item.name)).length;
     return `<button type="button" class="student-suggestion" data-name="${escapeHtml(item.name)}"><span>${escapeHtml(item.name)}</span><small>${count} submission${count === 1 ? "" : "s"}</small></button>`;
   }).join("") : `<div class="suggestion-empty">${state.submissions.length ? "No matching workbook names. You can add this name manually." : "Import a workbook to see student suggestions."}</div>`;
   suggestions.hidden = false;
