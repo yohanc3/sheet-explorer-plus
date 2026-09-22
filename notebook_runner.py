@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import operator
 import os
 import sys
 from pathlib import Path
@@ -11,8 +12,36 @@ from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, CellTimeoutError
 
 
+STATIC_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+}
+
+
 def source_text(value: str | list[str]) -> str:
     return "".join(value) if isinstance(value, list) else value
+
+
+def static_prompt_value(node: ast.AST):
+    if isinstance(node, ast.Constant) and isinstance(node.value, (str, int, float)):
+        return node.value
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        value = static_prompt_value(node.operand)
+        if isinstance(value, (int, float)):
+            return value if isinstance(node.op, ast.UAdd) else -value
+    if isinstance(node, ast.BinOp) and type(node.op) in STATIC_OPERATORS:
+        left = static_prompt_value(node.left)
+        right = static_prompt_value(node.right)
+        if isinstance(left, (int, float, str)) and isinstance(right, (int, float, str)):
+            try:
+                return STATIC_OPERATORS[type(node.op)](left, right)
+            except (TypeError, ValueError, ZeroDivisionError):
+                return None
+    return None
 
 
 def literal_print_text(statement: ast.stmt) -> str | None:
@@ -45,12 +74,9 @@ def input_markers(tree: ast.AST) -> list[tuple[ast.Call, str, bool]]:
                             continue
                         prompt = None
                         if child.args:
-                            try:
-                                prompt = ast.literal_eval(child.args[0])
-                            except (ValueError, TypeError):
-                                pass
-                        if isinstance(prompt, str) and prompt:
-                            markers[id(child)] = (prompt, True)
+                            prompt = static_prompt_value(child.args[0])
+                        if isinstance(prompt, (str, int, float)) and str(prompt):
+                            markers[id(child)] = (str(prompt), True)
                         elif previous_print:
                             markers[id(child)] = (previous_print, False)
                     visit_statement_lists(statement)

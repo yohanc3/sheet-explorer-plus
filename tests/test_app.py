@@ -249,6 +249,36 @@ class AppTestCase(unittest.TestCase):
         self.assertIn("orange", output)
         self.assertIn("Correct.", output)
 
+    def test_execute_notebook_replays_numeric_expression_prompts(self):
+        notebook = {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "metadata": {},
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "execution_count": 1,
+                    "metadata": {},
+                    "outputs": [
+                        {
+                            "name": "stdout",
+                            "output_type": "stream",
+                            "text": ["2525\n", "77\n", "32\n"],
+                        }
+                    ],
+                    "source": "first = int(input(5 * 5))\nsecond = int(input(5 + 2))\nprint(first + second)",
+                }
+            ],
+        }
+
+        executed = self.client.post("/api/execute-notebook", json={"notebook": notebook})
+
+        self.assertEqual(executed.status_code, 200)
+        result = executed.get_json()
+        self.assertTrue(result["success"])
+        output = "".join(result["cells"][0]["outputs"][0]["text"])
+        self.assertIn("32", output)
+
 
 if __name__ == "__main__":
     unittest.main()
