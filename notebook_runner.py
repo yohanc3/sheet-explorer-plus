@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -27,6 +28,11 @@ def main() -> None:
 
     execution_error: str | None = None
     try:
+        shim_directory = Path(__file__).resolve().parent / "runtime_shims"
+        python_path = os.environ.get("PYTHONPATH")
+        os.environ["PYTHONPATH"] = os.pathsep.join(
+            [str(shim_directory), *([python_path] if python_path else [])]
+        )
         client = NotebookClient(
             notebook,
             timeout=30,

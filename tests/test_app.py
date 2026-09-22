@@ -139,6 +139,37 @@ class AppTestCase(unittest.TestCase):
         html = result["cells"][3]["outputs"][0]["data"]["text/html"]
         self.assertEqual("".join(html), "<b>done</b>")
 
+    def test_execute_notebook_uses_local_exercise_report_shim(self):
+        notebook = {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "metadata": {},
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "execution_count": None,
+                    "metadata": {},
+                    "outputs": [],
+                    "source": "import exercise_report_response\nexercise_report_response.exercise_time_difficulty_report('03.7.1')",
+                },
+                {
+                    "cell_type": "code",
+                    "execution_count": None,
+                    "metadata": {},
+                    "outputs": [],
+                    "source": "print('student cell ran')",
+                },
+            ],
+        }
+
+        executed = self.client.post("/api/execute-notebook", json={"notebook": notebook})
+
+        self.assertEqual(executed.status_code, 200)
+        result = executed.get_json()
+        self.assertTrue(result["success"])
+        self.assertEqual(result["completed_count"], 2)
+        self.assertIn("student cell ran", "".join(result["cells"][1]["outputs"][0]["text"]))
+
 
 if __name__ == "__main__":
     unittest.main()
