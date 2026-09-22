@@ -249,8 +249,11 @@ async function runCode(button) {
     while (true) {
       const result = await api("/api/execute-python", {method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({cell, inputs, interactive: true})});
       if (result.needs_input) {
-        const value = await requestCodeInput(result.prompt);
-        if (value === null) { output.innerHTML = `<pre class="execution-output">Run canceled while waiting for input.</pre>`; break; }
+        const value = await requestTerminalInput(output, result);
+        if (value === null) {
+          output.innerHTML = `<pre class="execution-output">${escapeHtml(result.output || "")}\n[Run canceled]</pre>`;
+          break;
+        }
         inputs.push(value);
         continue;
       }
@@ -261,25 +264,33 @@ async function runCode(button) {
   finally { button.disabled = false; button.textContent = "Run"; }
 }
 
-const codeInputDialog = $("#code-input-dialog");
-let codeInputResolver = null;
-function finishCodeInput(value) {
-  if (!codeInputResolver) return;
-  const resolve = codeInputResolver;
-  codeInputResolver = null;
-  codeInputDialog.close();
-  resolve(value);
+function requestTerminalInput(output, result) {
+  const prompt = result.prompt || "Input: ";
+  const fullOutput = result.output || "";
+  const transcript = fullOutput.endsWith(prompt) ? fullOutput.slice(0, -prompt.length) : fullOutput;
+  output.innerHTML = `<div class="terminal-output" role="log" aria-live="polite">
+    <pre class="terminal-transcript">${escapeHtml(transcript)}</pre>
+    <form class="terminal-input-form">
+      <span class="terminal-prompt">${escapeHtml(prompt)}</span>
+      <input class="terminal-input" aria-label="Python input response" autocomplete="off">
+      <button class="terminal-submit" type="submit">Enter</button>
+      <button class="terminal-cancel" type="button">Cancel</button>
+    </form>
+  </div>`;
+  const form = output.querySelector(".terminal-input-form");
+  const input = output.querySelector(".terminal-input");
+  const cancel = output.querySelector(".terminal-cancel");
+  requestAnimationFrame(() => input.focus());
+  return new Promise(resolve => {
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const value = input.value;
+      output.innerHTML = `<pre class="execution-output">${escapeHtml(`${fullOutput}${value}\n`)}<span class="terminal-running">Continuing…</span></pre>`;
+      resolve(value);
+    }, {once: true});
+    cancel.addEventListener("click", () => resolve(null), {once: true});
+  });
 }
-function requestCodeInput(prompt) {
-  $("#code-input-prompt").textContent = prompt || "Enter a value for input().";
-  $("#code-input-value").value = "";
-  codeInputDialog.showModal();
-  requestAnimationFrame(() => $("#code-input-value").focus());
-  return new Promise(resolve => { codeInputResolver = resolve; });
-}
-$("#code-input-form").addEventListener("submit", event => { event.preventDefault(); finishCodeInput($("#code-input-value").value); });
-$("#code-input-cancel").addEventListener("click", () => finishCodeInput(null));
-codeInputDialog.addEventListener("cancel", event => { event.preventDefault(); finishCodeInput(null); });
 
 async function runAllCode() {
   if (!state.notebook || state.runningAll) return;

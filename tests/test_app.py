@@ -222,6 +222,22 @@ class AppTestCase(unittest.TestCase):
         self.assertTrue(completed.get_json()["success"])
         self.assertIn("Correct.", completed.get_json()["output"])
 
+    def test_interactive_input_returns_prior_output_before_prompt(self):
+        executed = self.client.post(
+            "/api/execute-python",
+            json={
+                "code": "print('First')\nprint('Second')\nprint('Third')\ninput('Reply: ')",
+                "inputs": [],
+                "interactive": True,
+            },
+        )
+
+        result = executed.get_json()
+        self.assertEqual(executed.status_code, 200)
+        self.assertTrue(result["needs_input"])
+        self.assertEqual(result["prompt"], "Reply: ")
+        self.assertEqual(result["output"], "First\nSecond\nThird\nReply: ")
+
     def test_execute_notebook_runs_cells_sequentially_with_per_cell_outputs(self):
         notebook = {
             "nbformat": 4,

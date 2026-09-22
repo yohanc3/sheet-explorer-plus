@@ -143,9 +143,15 @@ dialog { width: min(760px, calc(100% - 28px)); max-height: calc(100vh - 40px); p
 dialog::backdrop { background: rgba(16, 27, 25, .48); backdrop-filter: blur(2px); }
 .dialog-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
 .dialog-copy { margin-bottom: 20px; color: var(--muted); font-size: .875rem; }
-.code-input-dialog { width: min(470px, calc(100% - 28px)); }
-.code-input-dialog h2 { margin-bottom: 12px; }
-.code-input-prompt { min-height: 48px; margin-bottom: 18px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--canvas); font: .88rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; }
+.terminal-output { padding: 14px 16px; border-top: 1px solid var(--line); color: #283634; background: #f8faf9; font: .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.terminal-transcript { white-space: pre-wrap; }
+.terminal-input-form { display: flex; align-items: center; gap: 7px; }
+.terminal-prompt { white-space: pre-wrap; }
+.terminal-input { min-width: 90px; min-height: 32px; flex: 1; padding: 3px 7px; border-radius: 4px; font: inherit; }
+.terminal-submit, .terminal-cancel { min-height: 30px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--ink); background: white; font: 600 .74rem/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
+.terminal-submit { color: white; border-color: var(--accent); background: var(--accent); }
+.terminal-cancel { color: var(--muted); }
+.terminal-running { color: var(--muted); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .inline-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-bottom: 20px; }
 .class-list { display: grid; gap: 12px; }

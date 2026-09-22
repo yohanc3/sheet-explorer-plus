@@ -78,18 +78,6 @@
     <form id="new-class" class="inline-form"><input name="name" required placeholder="Class name, e.g. CS 127 — Fall 2026"><button class="button primary">Add class</button></form>
     <div id="class-list" class="class-list"></div>
   </dialog>
-  <dialog id="code-input-dialog" class="code-input-dialog">
-    <div class="eyebrow">Python input</div>
-    <h2>Student code is waiting</h2>
-    <p id="code-input-prompt" class="code-input-prompt"></p>
-    <form id="code-input-form">
-      <label>Your response<input id="code-input-value" autocomplete="off"></label>
-      <div class="dialog-actions">
-        <button id="code-input-cancel" class="button secondary" type="button">Cancel run</button>
-        <button class="button primary" type="submit">Continue</button>
-      </div>
-    </form>
-  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </body>
