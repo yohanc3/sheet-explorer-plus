@@ -2,6 +2,7 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from openpyxl import Workbook
 
@@ -56,6 +57,49 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(submission["timestamp"], "2021-08-25T13:15:35")
         self.assertEqual(submission["time"], "30 min or less")
         self.assertEqual(submission["share"], "https://colab.research.google.com/drive/1tw6sWATzkK6kZB3msBVZUojB9koL_fDa?usp=sharing")
+
+    def test_sync_master_sheet_downloads_csv_and_replaces_submissions(self):
+        csv_data = (
+            "Timestamp,title,first_name,last_name,time,difficulty,confident,needswork,"
+            "suggestions,corrections,locals,share\n"
+            "8/25/2021 13:15:35,Intro,Grace,Hopper,30 min,Easy,Loops,Syntax,None,N/A,26,"
+            "https://colab.research.google.com/drive/abcdefghij12345?usp=sharing\n"
+        ).encode()
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.iter_content.return_value = [csv_data[:40], csv_data[40:]]
+
+        with patch.object(application.requests, "get", return_value=response) as get:
+            synced = self.client.post("/api/sync-master")
+
+        self.assertEqual(synced.status_code, 200)
+        self.assertEqual(synced.get_json()["count"], 1)
+        get.assert_called_once_with(
+            application.app.config["MASTER_SHEET_EXPORT_URL"],
+            timeout=(5, 30),
+            stream=True,
+        )
+        submission = self.client.get("/api/state").get_json()["submissions"][0]
+        self.assertEqual(submission["full_name"], "Grace Hopper")
+        self.assertEqual(submission["title"], "Intro")
+
+    def test_sync_failure_keeps_last_saved_submissions(self):
+        with application.db() as connection:
+            connection.execute(
+                """INSERT INTO submissions
+                (title, first_name, last_name, full_name, share)
+                VALUES (?, ?, ?, ?, ?)""",
+                ("Saved assignment", "Ada", "Lovelace", "Ada Lovelace", "saved-link"),
+            )
+
+        with self.assertLogs(application.app.logger, level="ERROR"):
+            with patch.object(application.requests, "get", side_effect=application.requests.Timeout):
+                synced = self.client.post("/api/sync-master")
+
+        self.assertEqual(synced.status_code, 502)
+        submissions = self.client.get("/api/state").get_json()["submissions"]
+        self.assertEqual(len(submissions), 1)
+        self.assertEqual(submissions[0]["title"], "Saved assignment")
 
     def test_resolve_colab_url_and_execute_python(self):
         response = self.client.post(

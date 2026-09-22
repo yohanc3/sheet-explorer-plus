@@ -11,17 +11,18 @@
   <header class="topbar">
     <div class="brand-group">
       <a class="brand" href="/" aria-label="Submission Desk home"><span class="brand-mark">SD</span><span>Submission Desk</span></a>
-      <div id="workbook-summary" class="workbook-summary"><span></span>No workbook loaded</div>
+      <div id="workbook-summary" class="workbook-summary"><span></span>Checking master sheet…</div>
     </div>
     <div class="header-actions">
-      <button id="import-trigger" class="button primary">Import workbook</button>
+      <button id="sync-trigger" class="button primary">Refresh submissions</button>
+      <button id="import-trigger" class="button secondary">Import file</button>
       <input id="workbook" type="file" accept=".xlsx" hidden>
       <button id="manage-classes" class="button secondary">Manage classes</button>
     </div>
   </header>
   <div id="import-progress" class="import-progress" hidden>
     <div id="import-progress-bar" class="import-progress-bar"></div>
-    <span id="import-progress-text">Uploading workbook…</span>
+    <span id="import-progress-text">Downloading latest submissions…</span>
   </div>
 
   <main class="workspace">
@@ -47,11 +48,11 @@
 
     <section id="viewer" class="viewer">
       <div id="empty-state" class="empty-state">
-        <div id="empty-step" class="empty-step">Get started</div>
-        <div id="empty-icon" class="empty-icon">01</div>
-        <h1 id="empty-title">Import a workbook</h1>
-        <p id="empty-message">Load the master submissions spreadsheet to begin grading.</p>
-        <div id="empty-actions"><button class="button primary" data-import>Choose .xlsx file</button></div>
+        <div id="empty-step" class="empty-step">Master submissions</div>
+        <div id="empty-icon" class="empty-icon">↻</div>
+        <h1 id="empty-title">Loading latest submissions</h1>
+        <p id="empty-message">Downloading the public master Google Sheet.</p>
+        <div id="empty-actions"></div>
       </div>
       <div id="notebook-view" hidden>
         <div class="notebook-toolbar">

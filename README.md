@@ -1,6 +1,6 @@
 # Submission Desk
 
-A local Flask app for reviewing student Google Colab/Jupyter notebook submissions from a master Excel workbook. Classes and rosters are stored in SQLite and start empty—there are no hard-coded students.
+A local Flask app for reviewing student Google Colab/Jupyter notebook submissions from a public master Google Sheet. The app downloads the latest submissions automatically whenever the page opens. Classes and rosters are stored in SQLite and start empty—there are no hard-coded students.
 
 ## Local setup
 
@@ -53,10 +53,12 @@ git push origin main
 ## Workflow
 
 1. Open **Manage classes**, add a class, and add its students by full name.
-2. Import the master `.xlsx` file. Its first worksheet must include `title`, `first_name`, `last_name`, and `share` columns. Existing submission rows are replaced; classes are kept.
+2. Open or refresh the app. It automatically downloads the latest rows from the configured public master Google Sheet. Use **Refresh submissions** to check again at any time. **Import file** remains available as a manual `.xlsx` fallback.
 3. Choose an assignment and optionally a class. The queue shows only that class roster, in roster order.
 4. Select a student to load their shared Colab notebook. You can inspect saved outputs, run code locally, open the original notebook in Colab, or use Quick grade with the arrow keys.
 
 Application data is saved in `data/sheet_explorer.db`. Set `SHEET_EXPLORER_DB` to use another database path.
+
+The default master-sheet export URL points to the public course sheet. Set `MASTER_SHEET_EXPORT_URL` to a Google Sheets CSV export URL if a different sheet is needed.
 
 > Python execution runs student code on the local machine. Use this only with submissions you trust or run the app in an isolated environment.

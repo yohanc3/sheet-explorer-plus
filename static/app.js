@@ -1,6 +1,7 @@
 const state = {
   classes: [], submissions: [], mode: "assignment", classId: "", assignment: "", student: "",
-  query: "", dateFrom: "", dateTo: "", queue: [], selectedIndex: -1, cells: [], loadingToken: 0, importing: false,
+  query: "", dateFrom: "", dateTo: "", queue: [], selectedIndex: -1, cells: [], loadingToken: 0,
+  importing: false, syncing: false, syncError: "", syncedAt: "",
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -73,8 +74,12 @@ function showWorkspaceMessage(step, icon, title, message, actions = "") {
 function updateWorkspaceState() {
   const assignmentMissing = state.mode === "assignment" && !state.assignment;
   const studentMissing = state.mode === "student" && !state.student;
-  if (!state.submissions.length) {
-    showWorkspaceMessage("Step 1 of 3", "01", "Import the master workbook", "Load the .xlsx export containing student names, assignment titles, and Colab share links.", `<button class="button primary" data-import>Choose .xlsx file</button>`);
+  if (state.syncing && !state.submissions.length) {
+    showWorkspaceMessage("Master submissions", "↻", "Loading latest submissions", "Downloading the public master Google Sheet.");
+  } else if (!state.submissions.length && state.syncError) {
+    showWorkspaceMessage("Refresh failed", "!", "Could not load submissions", state.syncError, `<button class="button primary" data-sync>Try again</button> <button class="button secondary" data-import>Import .xlsx instead</button>`);
+  } else if (!state.submissions.length) {
+    showWorkspaceMessage("No submissions", "—", "The master sheet is empty", "Refresh the public Google Sheet or import an .xlsx file instead.", `<button class="button primary" data-sync>Refresh submissions</button> <button class="button secondary" data-import>Import .xlsx instead</button>`);
   } else if (assignmentMissing) {
     showWorkspaceMessage("Choose scope", "01", "Choose an assignment", "Select an assignment in the left panel to build its grading queue.");
   } else if (studentMissing) {
@@ -128,7 +133,11 @@ function render() {
   renderClassManager();
   const assignments = unique(state.submissions.map(item => item.title));
   $("#workbook-summary").classList.toggle("ready", state.submissions.length > 0);
-  $("#workbook-summary").lastChild.textContent = state.submissions.length ? `${state.submissions.length} submissions · ${assignments.length} assignments` : "No workbook loaded";
+  $("#workbook-summary").lastChild.textContent = state.syncing
+    ? "Refreshing master sheet…"
+    : state.submissions.length
+      ? `${state.submissions.length} submissions · ${assignments.length} assignments${state.syncedAt ? " · Updated just now" : ""}`
+      : "No submissions loaded";
 }
 
 function sourceText(source) { return Array.isArray(source) ? source.join("") : (source || ""); }
@@ -267,6 +276,32 @@ function setImportProgress(visible, percent = 0, message = "Uploading workbook�
   $("#import-progress-bar").style.width = processing ? "" : `${percent}%`;
   $("#import-progress-text").textContent = message;
   $("#import-trigger").disabled = visible;
+  $("#sync-trigger").disabled = visible;
+}
+
+async function syncMasterSheet() {
+  if (state.importing) return;
+  state.importing = true;
+  state.syncing = true;
+  state.syncError = "";
+  setImportProgress(true, 0, "Downloading latest submissions…", true);
+  render();
+  try {
+    const result = await api("/api/sync-master", {method: "POST"});
+    state.syncedAt = result.synced_at || "now";
+    clearSelection();
+    await refresh();
+    toast(result.message);
+  } catch (error) {
+    state.syncError = error.message;
+    await refresh();
+    toast(state.submissions.length ? `${error.message} Showing the last saved submissions.` : error.message, true);
+  } finally {
+    state.importing = false;
+    state.syncing = false;
+    setImportProgress(false);
+    render();
+  }
 }
 
 function importWorkbook(file) {
@@ -282,7 +317,7 @@ function importWorkbook(file) {
   xhr.addEventListener("load", async () => {
     try {
       if (xhr.status < 200 || xhr.status >= 300) throw new Error(xhr.response?.error || `Import failed (${xhr.status})`);
-      state.assignment = ""; state.student = ""; clearSelection();
+      state.assignment = ""; state.student = ""; state.syncedAt = ""; state.syncError = ""; clearSelection();
       await refresh(); toast(xhr.response.message);
     } catch (error) { toast(error.message, true); }
     finally { state.importing = false; setImportProgress(false); }
@@ -294,8 +329,9 @@ function importWorkbook(file) {
 $("#workbook").addEventListener("change", async event => {
   importWorkbook(event.target.files[0]); event.target.value = "";
 });
+$("#sync-trigger").addEventListener("click", syncMasterSheet);
 $("#import-trigger").addEventListener("click", () => $("#workbook").click());
-document.addEventListener("click", event => { if (event.target.closest("[data-import]")) $("#workbook").click(); if (event.target.closest("[data-clear-filters]")) { state.query = ""; state.dateFrom = ""; state.dateTo = ""; $("#search").value = ""; $("#date-from").value = ""; $("#date-to").value = ""; clearSelection(); buildQueue(); } if (!event.target.closest(".student-picker")) document.querySelectorAll(".student-suggestions").forEach(element => element.hidden = true); });
+document.addEventListener("click", event => { if (event.target.closest("[data-sync]")) syncMasterSheet(); if (event.target.closest("[data-import]")) $("#workbook").click(); if (event.target.closest("[data-clear-filters]")) { state.query = ""; state.dateFrom = ""; state.dateTo = ""; $("#search").value = ""; $("#date-from").value = ""; $("#date-to").value = ""; clearSelection(); buildQueue(); } if (!event.target.closest(".student-picker")) document.querySelectorAll(".student-suggestions").forEach(element => element.hidden = true); });
 document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => { state.mode = button.dataset.mode; clearSelection(); render(); }));
 $("#class-filter").addEventListener("change", event => { state.classId = event.target.value; clearSelection(); render(); });
 $("#assignment-filter").addEventListener("change", event => { state.assignment = event.target.value; clearSelection(); buildQueue(); });
@@ -328,4 +364,10 @@ $("#class-list").addEventListener("click", async event => {
   } catch(error) { toast(error.message, true); }
 });
 
-refresh().catch(error => toast(error.message, true));
+async function initialize() {
+  try { await refresh(); }
+  catch (error) { toast(error.message, true); }
+  await syncMasterSheet();
+}
+
+initialize();

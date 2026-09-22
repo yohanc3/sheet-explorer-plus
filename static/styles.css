@@ -169,6 +169,7 @@ dialog::backdrop { background: rgba(16, 27, 25, .48); backdrop-filter: blur(2px)
 @media (max-width: 560px) {
   .topbar { height: auto; min-height: 68px; padding: 10px 12px; }
   .brand > span:last-child { display: none; }
+  #import-trigger { display: none; }
   .button { padding: 0 10px; }
   .inline-form { grid-template-columns: 1fr; }
   .class-card-header { align-items: flex-start; }

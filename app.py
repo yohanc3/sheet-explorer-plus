@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 import re
@@ -24,9 +26,21 @@ DATABASE = Path(os.environ.get("SHEET_EXPLORER_DB", DATA_DIR / "sheet_explorer.d
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_NOTEBOOK_BYTES = 15 * 1024 * 1024
 FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,200}$")
+MASTER_SHEET_EXPORT_URL = os.environ.get(
+    "MASTER_SHEET_EXPORT_URL",
+    "https://docs.google.com/spreadsheets/d/"
+    "1cWTdj4B2X45MApBdnaGFF2VjLPXhM7opJSuZ6Zon3PE/export?format=csv&gid=2007683856",
+)
+SUBMISSION_COLUMNS = (
+    "timestamp", "title", "first_name", "last_name", "full_name", "time", "difficulty",
+    "confident", "needswork", "suggestions", "corrections", "locals", "share",
+)
 
 app = Flask(__name__)
-app.config.update(MAX_CONTENT_LENGTH=MAX_UPLOAD_BYTES)
+app.config.update(
+    MAX_CONTENT_LENGTH=MAX_UPLOAD_BYTES,
+    MASTER_SHEET_EXPORT_URL=MASTER_SHEET_EXPORT_URL,
+)
 
 
 @contextmanager
@@ -122,6 +136,75 @@ def hyperlink_value(cell: Any) -> str:
     return formula.group(1) if formula else value
 
 
+def submission_record(row: dict[str, Any], share: str, epoch: Any = None) -> tuple[str, ...]:
+    first_name, last_name = clean(row.get("first_name")), clean(row.get("last_name"))
+    return (
+        timestamp_value(row.get("timestamp"), epoch), clean(row.get("title")), first_name, last_name,
+        f"{first_name} {last_name}".strip(), clean(row.get("time")), clean(row.get("difficulty")),
+        clean(row.get("confident")), clean(row.get("needswork")), clean(row.get("suggestions")),
+        clean(row.get("corrections")), clean(row.get("locals")), clean(share),
+    )
+
+
+def validate_headers(headers: list[str]) -> None:
+    required = {"title", "first_name", "last_name", "share"}
+    missing = sorted(required - set(headers))
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(missing)}")
+
+
+def records_from_xlsx(stream: Any) -> list[tuple[str, ...]]:
+    workbook = load_workbook(stream, read_only=False, data_only=False)
+    try:
+        sheet = workbook[workbook.sheetnames[0]]
+        rows = sheet.iter_rows()
+        raw_headers = next(rows, None)
+        if not raw_headers:
+            raise ValueError("The first worksheet is empty.")
+        headers = [clean(cell.value).lower() for cell in raw_headers]
+        validate_headers(headers)
+
+        records = []
+        for cells in rows:
+            row = dict(zip(headers, (cell.value for cell in cells)))
+            cell_by_header = dict(zip(headers, cells))
+            if not any(clean(cell.value) for cell in cells):
+                continue
+            records.append(submission_record(row, hyperlink_value(cell_by_header["share"]), workbook.epoch))
+        return records
+    finally:
+        workbook.close()
+
+
+def records_from_csv(data: bytes) -> list[tuple[str, ...]]:
+    text = data.decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(text, newline=""))
+    if not reader.fieldnames:
+        raise ValueError("The Google Sheet is empty.")
+    headers = [clean(header).lower() for header in reader.fieldnames]
+    validate_headers(headers)
+    reader.fieldnames = headers
+
+    records = []
+    for row in reader:
+        if not any(clean(value) for value in row.values() if value is not None):
+            continue
+        records.append(submission_record(row, clean(row.get("share"))))
+    if not records:
+        raise ValueError("The Google Sheet does not contain any submissions.")
+    return records
+
+
+def replace_submissions(records: list[tuple[str, ...]]) -> None:
+    with db() as connection:
+        connection.execute("DELETE FROM submissions")
+        connection.executemany(
+            f"""INSERT INTO submissions ({', '.join(SUBMISSION_COLUMNS)})
+            VALUES ({', '.join('?' for _ in SUBMISSION_COLUMNS)})""",
+            records,
+        )
+
+
 def serialize_class(row: sqlite3.Row, connection: sqlite3.Connection) -> dict[str, Any]:
     students = connection.execute(
         "SELECT id, name, position FROM students WHERE class_id = ? ORDER BY position, name",
@@ -164,49 +247,44 @@ def import_workbook():
         return jsonify(error="Only .xlsx workbooks are supported."), 400
 
     try:
-        workbook = load_workbook(uploaded.stream, read_only=False, data_only=False)
-        sheet = workbook[workbook.sheetnames[0]]
-        rows = sheet.iter_rows()
-        raw_headers = next(rows, None)
-        if not raw_headers:
-            return jsonify(error="The first worksheet is empty."), 400
-        headers = [clean(cell.value).lower() for cell in raw_headers]
-        required = {"title", "first_name", "last_name", "share"}
-        missing = sorted(required - set(headers))
-        if missing:
-            return jsonify(error=f"Missing required columns: {', '.join(missing)}"), 400
-
-        records = []
-        for cells in rows:
-            row = dict(zip(headers, (cell.value for cell in cells)))
-            cell_by_header = dict(zip(headers, cells))
-            first_name, last_name = clean(row.get("first_name")), clean(row.get("last_name"))
-            if not any(clean(cell.value) for cell in cells):
-                continue
-            records.append(
-                (
-                    timestamp_value(row.get("timestamp"), workbook.epoch), clean(row.get("title")),
-                    first_name, last_name, f"{first_name} {last_name}".strip(), clean(row.get("time")),
-                    clean(row.get("difficulty")), clean(row.get("confident")), clean(row.get("needswork")),
-                    clean(row.get("suggestions")), clean(row.get("corrections")), clean(row.get("locals")),
-                    hyperlink_value(cell_by_header["share"]),
-                )
-            )
-        workbook.close()
+        records = records_from_xlsx(uploaded.stream)
     except Exception as exc:
         app.logger.exception("Workbook import failed")
         return jsonify(error=f"Could not read that workbook: {exc}"), 400
 
-    with db() as connection:
-        connection.execute("DELETE FROM submissions")
-        connection.executemany(
-            """INSERT INTO submissions
-            (timestamp, title, first_name, last_name, full_name, time, difficulty,
-             confident, needswork, suggestions, corrections, locals, share)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            records,
-        )
+    replace_submissions(records)
     return jsonify(message=f"Loaded {len(records)} submissions.", count=len(records))
+
+
+@app.post("/api/sync-master")
+def sync_master_sheet():
+    try:
+        response = requests.get(
+            app.config["MASTER_SHEET_EXPORT_URL"],
+            timeout=(5, 30),
+            stream=True,
+        )
+        response.raise_for_status()
+        data = bytearray()
+        for chunk in response.iter_content(64 * 1024):
+            data.extend(chunk)
+            if len(data) > MAX_UPLOAD_BYTES:
+                return jsonify(error="The master Google Sheet is larger than 20 MB."), 413
+        records = records_from_csv(bytes(data))
+    except requests.RequestException:
+        app.logger.exception("Master Google Sheet download failed")
+        return jsonify(error="Could not download the latest submissions. Using the last saved copy."), 502
+    except (csv.Error, UnicodeDecodeError, ValueError) as exc:
+        app.logger.exception("Master Google Sheet import failed")
+        return jsonify(error=f"Could not read the master Google Sheet: {exc}"), 502
+
+    replace_submissions(records)
+    synced_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    return jsonify(
+        message=f"Updated {len(records)} submissions from the master Google Sheet.",
+        count=len(records),
+        synced_at=synced_at,
+    )
 
 
 @app.post("/api/classes")
