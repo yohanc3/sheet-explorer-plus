@@ -245,7 +245,7 @@ async function runCode(button) {
   const output = document.querySelector(`[data-output="${index}"]`); button.disabled = true; button.textContent = "Running…";
   output.innerHTML = `<pre class="execution-output">Running with local Python…</pre>`;
   try {
-    const result = await api("/api/execute-python", {method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({code: sourceText(cell.source)})});
+    const result = await api("/api/execute-python", {method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({cell})});
     output.innerHTML = `<pre class="execution-output">${escapeHtml(result.output || result.error || "Completed with no text output.")}</pre>` + (result.plots || []).map(plot => `<img class="output-image" alt="Python plot" src="data:image/png;base64,${plot}">`).join("");
   } catch (error) { output.innerHTML = `<pre class="execution-output">${escapeHtml(error.message)}</pre>`; }
   finally { button.disabled = false; button.textContent = "Run"; }

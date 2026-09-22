@@ -130,6 +130,62 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(executed.status_code, 200)
         self.assertEqual(executed.get_json()["output"].strip(), "42")
 
+    def test_execute_python_replays_saved_cell_inputs(self):
+        cell = {
+            "cell_type": "code",
+            "source": (
+                "message = input('Write a short message:')\n"
+                "limit = int(input('What is the limit?'))\n"
+                "print((message * 3)[:limit])"
+            ),
+            "outputs": [
+                {
+                    "name": "stdout",
+                    "output_type": "stream",
+                    "text": [
+                        "Write a short message:Go!\n",
+                        "What is the limit?6\n",
+                        "Go!Go!\n",
+                    ],
+                }
+            ],
+        }
+
+        executed = self.client.post("/api/execute-python", json={"cell": cell})
+
+        self.assertEqual(executed.status_code, 200)
+        result = executed.get_json()
+        self.assertTrue(result["success"])
+        self.assertIn("Write a short message:Go!", result["output"])
+        self.assertIn("What is the limit?6", result["output"])
+        self.assertIn("Go!Go!", result["output"])
+
+    def test_execute_python_returns_eof_instead_of_hanging_without_saved_input(self):
+        executed = self.client.post(
+            "/api/execute-python",
+            json={"code": "input('Missing saved input:')"},
+        )
+
+        self.assertEqual(executed.status_code, 422)
+        self.assertEqual(executed.get_json()["error"], "EOFError: EOF when reading a line")
+
+    def test_execute_python_supports_colab_syntax_and_local_report_shim(self):
+        cell = {
+            "cell_type": "code",
+            "source": (
+                "if False:\n"
+                "  ! git clone --quiet https://github.com/bsheese/cs125_tools.git\n"
+                "import exercise_report_response\n"
+                "exercise_report_response.exercise_time_difficulty_report('03.7.1')"
+            ),
+            "outputs": [],
+        }
+
+        executed = self.client.post("/api/execute-python", json={"cell": cell})
+
+        self.assertEqual(executed.status_code, 200)
+        self.assertTrue(executed.get_json()["success"])
+
     def test_execute_notebook_runs_cells_sequentially_with_per_cell_outputs(self):
         notebook = {
             "nbformat": 4,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import copy
 import io
 import json
 import os
@@ -19,6 +20,8 @@ import requests
 from flask import Flask, jsonify, render_template, request
 from openpyxl import load_workbook
 from openpyxl.utils.datetime import from_excel
+
+from notebook_runner import add_saved_inputs, source_text
 
 
 ROOT = Path(__file__).resolve().parent
@@ -447,7 +450,13 @@ def resolve_notebook():
 @app.post("/api/execute-python")
 def execute_python():
     payload = request.get_json(silent=True) or {}
-    code = payload.get("code")
+    cell = payload.get("cell")
+    if isinstance(cell, dict):
+        cell = copy.deepcopy(cell)
+        add_saved_inputs(cell)
+        code = source_text(cell.get("source", ""))
+    else:
+        code = payload.get("code")
     if not isinstance(code, str) or not code.strip():
         return jsonify(error="Code is required.", output="", success=False), 400
     if len(code) > 100_000:
@@ -456,9 +465,15 @@ def execute_python():
         code_path = Path(directory) / "student_code.py"
         code_path.write_text(code, encoding="utf-8")
         try:
+            environment = os.environ.copy()
+            python_path = environment.get("PYTHONPATH")
+            environment["PYTHONPATH"] = os.pathsep.join(
+                [str(ROOT / "runtime_shims"), *([python_path] if python_path else [])]
+            )
             completed = subprocess.run(
                 [sys.executable, str(ROOT / "execution_runner.py"), str(code_path)],
-                capture_output=True, text=True, timeout=30, cwd=directory,
+                capture_output=True, text=True, input="", timeout=30, cwd=directory,
+                env=environment,
             )
             result = json.loads(completed.stdout)
             return jsonify(result), (200 if result.get("success") else 422)

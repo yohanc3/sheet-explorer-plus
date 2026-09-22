@@ -3,10 +3,23 @@ from __future__ import annotations
 import base64
 import io
 import json
+import re
 import sys
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+
+
+def prepare_colab_code(code: str, namespace: dict) -> str:
+    """Translate Colab/IPython shell and magic syntax before plain execution."""
+    if not re.search(r"^\s*[!%]", code, flags=re.MULTILINE):
+        return code
+    from IPython.core.inputtransformer2 import TransformerManager
+    from IPython.core.interactiveshell import InteractiveShell
+
+    shell = InteractiveShell.instance()
+    namespace["get_ipython"] = lambda: shell
+    return TransformerManager().transform_cell(code)
 
 
 def main() -> None:
@@ -18,6 +31,7 @@ def main() -> None:
     try:
         code = Path(sys.argv[1]).read_text(encoding="utf-8")
         namespace = {"__name__": "__main__"}
+        code = prepare_colab_code(code, namespace)
         with redirect_stdout(output), redirect_stderr(error_output):
             exec(compile(code, "student_code.py", "exec"), namespace)
         try:
