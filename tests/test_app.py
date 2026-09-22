@@ -170,6 +170,85 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(result["completed_count"], 2)
         self.assertIn("student cell ran", "".join(result["cells"][1]["outputs"][0]["text"]))
 
+    def test_execute_notebook_replays_saved_input_values(self):
+        notebook = {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "metadata": {},
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "execution_count": 1,
+                    "metadata": {},
+                    "outputs": [
+                        {
+                            "name": "stdout",
+                            "output_type": "stream",
+                            "text": ["Message:hello\n", "Limit:12\n", "hellohello\n"],
+                        }
+                    ],
+                    "source": "message = input('Message:')\nlimit = int(input('Limit:'))\nprint((message * 2)[:limit])",
+                }
+            ],
+        }
+
+        executed = self.client.post("/api/execute-notebook", json={"notebook": notebook})
+
+        self.assertEqual(executed.status_code, 200)
+        result = executed.get_json()
+        self.assertTrue(result["success"])
+        output = "".join(result["cells"][0]["outputs"][0]["text"])
+        self.assertIn("Message:hello", output)
+        self.assertIn("Limit:12", output)
+        self.assertIn("hellohello", output)
+
+    def test_execute_notebook_replays_bare_input_inside_a_loop(self):
+        notebook = {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "metadata": {},
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "execution_count": 1,
+                    "metadata": {},
+                    "outputs": [
+                        {
+                            "name": "stdout",
+                            "output_type": "stream",
+                            "text": [
+                                "Which fruit?\n",
+                                "apple\n",
+                                "Try again.\n",
+                                "Which fruit?\n",
+                                "orange\n",
+                                "Correct.\n",
+                            ],
+                        }
+                    ],
+                    "source": (
+                        "while True:\n"
+                        "    print('Which fruit?')\n"
+                        "    fruit = input()\n"
+                        "    if fruit == 'orange':\n"
+                        "        print('Correct.')\n"
+                        "        break\n"
+                        "    print('Try again.')"
+                    ),
+                }
+            ],
+        }
+
+        executed = self.client.post("/api/execute-notebook", json={"notebook": notebook})
+
+        self.assertEqual(executed.status_code, 200)
+        result = executed.get_json()
+        self.assertTrue(result["success"])
+        output = "".join(result["cells"][0]["outputs"][0]["text"])
+        self.assertIn("apple", output)
+        self.assertIn("orange", output)
+        self.assertIn("Correct.", output)
+
 
 if __name__ == "__main__":
     unittest.main()
