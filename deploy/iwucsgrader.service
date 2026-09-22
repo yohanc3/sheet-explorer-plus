@@ -1,0 +1,23 @@
+[Unit]
+Description=IWU CS Grader Flask application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/iwucsgrader
+Environment=SHEET_EXPLORER_DB=/var/lib/iwucsgrader/sheet_explorer.db
+Environment=JUPYTER_RUNTIME_DIR=/run/iwucsgrader
+RuntimeDirectory=iwucsgrader
+ExecStart=/opt/iwucsgrader/.venv/bin/gunicorn --workers 2 --threads 2 --bind 127.0.0.1:8000 --timeout 240 --access-logfile - --error-logfile - app:app
+Restart=on-failure
+RestartSec=3
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/iwucsgrader
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
