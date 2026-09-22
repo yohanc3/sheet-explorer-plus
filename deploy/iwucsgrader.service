@@ -10,6 +10,8 @@ Group=iwucsgrader
 WorkingDirectory=/opt/iwucsgrader
 Environment=SHEET_EXPLORER_DB=/var/lib/iwucsgrader/sheet_explorer.db
 Environment=JUPYTER_RUNTIME_DIR=/run/iwucsgrader
+Environment=HOME=/var/lib/iwucsgrader
+Environment=IPYTHONDIR=/var/lib/iwucsgrader/.ipython
 RuntimeDirectory=iwucsgrader
 ExecStart=/opt/iwucsgrader/.venv/bin/gunicorn --workers 2 --threads 2 --bind 127.0.0.1:8000 --timeout 240 --no-control-socket --access-logfile - --error-logfile - app:app
 Restart=on-failure
