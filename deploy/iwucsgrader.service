@@ -5,19 +5,29 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ubuntu
-Group=ubuntu
+User=iwucsgrader
+Group=iwucsgrader
 WorkingDirectory=/opt/iwucsgrader
 Environment=SHEET_EXPLORER_DB=/var/lib/iwucsgrader/sheet_explorer.db
 Environment=JUPYTER_RUNTIME_DIR=/run/iwucsgrader
 RuntimeDirectory=iwucsgrader
-ExecStart=/opt/iwucsgrader/.venv/bin/gunicorn --workers 2 --threads 2 --bind 127.0.0.1:8000 --timeout 240 --access-logfile - --error-logfile - app:app
+ExecStart=/opt/iwucsgrader/.venv/bin/gunicorn --workers 2 --threads 2 --bind 127.0.0.1:8000 --timeout 240 --no-control-socket --access-logfile - --error-logfile - app:app
 Restart=on-failure
 RestartSec=3
 PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
 ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
 ReadWritePaths=/var/lib/iwucsgrader
 NoNewPrivileges=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
