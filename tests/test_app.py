@@ -111,6 +111,34 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(executed.status_code, 200)
         self.assertEqual(executed.get_json()["output"].strip(), "42")
 
+    def test_execute_notebook_runs_cells_sequentially_with_per_cell_outputs(self):
+        notebook = {
+            "nbformat": 4,
+            "nbformat_minor": 5,
+            "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}},
+            "cells": [
+                {"cell_type": "code", "metadata": {}, "source": "answer = 21", "outputs": [], "execution_count": None},
+                {"cell_type": "code", "metadata": {}, "source": "print(answer * 2)", "outputs": [], "execution_count": None},
+                {"cell_type": "code", "metadata": {}, "source": "answer * 3", "outputs": [], "execution_count": None},
+                {"cell_type": "code", "metadata": {}, "source": "from IPython.display import HTML, display\ndisplay(HTML('<b>done</b>'))", "outputs": [], "execution_count": None},
+            ],
+        }
+
+        executed = self.client.post("/api/execute-notebook", json={"notebook": notebook})
+
+        self.assertEqual(executed.status_code, 200)
+        result = executed.get_json()
+        self.assertTrue(result["success"])
+        self.assertEqual([cell["status"] for cell in result["cells"]], ["completed"] * 4)
+        self.assertEqual(result["cells"][1]["outputs"][0]["output_type"], "stream")
+        stream_text = result["cells"][1]["outputs"][0]["text"]
+        self.assertEqual("".join(stream_text).strip(), "42")
+        self.assertEqual(result["cells"][2]["outputs"][0]["output_type"], "execute_result")
+        expression_text = result["cells"][2]["outputs"][0]["data"]["text/plain"]
+        self.assertEqual("".join(expression_text), "63")
+        html = result["cells"][3]["outputs"][0]["data"]["text/html"]
+        self.assertEqual("".join(html), "<b>done</b>")
+
 
 if __name__ == "__main__":
     unittest.main()

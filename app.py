@@ -425,6 +425,43 @@ def execute_python():
             return jsonify(success=False, output="", error=f"Execution failed: {exc}"), 500
 
 
+@app.post("/api/execute-notebook")
+def execute_notebook():
+    notebook = (request.get_json(silent=True) or {}).get("notebook")
+    if not isinstance(notebook, dict) or not isinstance(notebook.get("cells"), list):
+        return jsonify(error="A valid notebook is required.", success=False), 400
+    if len(notebook["cells"]) > 500:
+        return jsonify(error="The notebook contains more than 500 cells.", success=False), 413
+    source_size = sum(
+        len(clean(cell.get("source")))
+        for cell in notebook["cells"]
+        if isinstance(cell, dict)
+    )
+    if source_size > 500_000:
+        return jsonify(error="The notebook contains more than 500 KB of source code.", success=False), 413
+
+    with tempfile.TemporaryDirectory(prefix="sheet-explorer-notebook-") as directory:
+        notebook_path = Path(directory) / "submission.ipynb"
+        notebook_path.write_text(json.dumps(notebook), encoding="utf-8")
+        try:
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "notebook_runner.py"), str(notebook_path)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                cwd=directory,
+            )
+            if completed.returncode != 0:
+                app.logger.error("Notebook runner failed: %s", completed.stderr[-2000:])
+                return jsonify(error="The notebook kernel could not start.", success=False), 500
+            return jsonify(json.loads(completed.stdout))
+        except subprocess.TimeoutExpired:
+            return jsonify(error="Run all stopped after three minutes.", success=False), 408
+        except (json.JSONDecodeError, OSError) as exc:
+            app.logger.exception("Notebook execution failed")
+            return jsonify(error=f"Notebook execution failed: {exc}", success=False), 500
+
+
 @app.errorhandler(413)
 def too_large(_error):
     return jsonify(error="Upload is larger than 20 MB."), 413

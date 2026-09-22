@@ -1,6 +1,7 @@
 const state = {
   classes: [], submissions: [], mode: "assignment", classId: "", assignment: "", student: "",
   query: "", dateFrom: "", dateTo: "", queue: [], selectedIndex: -1, cells: [], loadingToken: 0,
+  notebook: null, runtimeByCell: {}, runningAll: false, executionToken: 0,
   importing: false, syncing: false, syncError: "", syncedAt: "",
 };
 
@@ -95,9 +96,15 @@ function updateWorkspaceState() {
 function clearSelection() {
   state.selectedIndex = -1;
   state.cells = [];
+  state.notebook = null;
+  state.runtimeByCell = {};
+  state.runningAll = false;
+  state.executionToken += 1;
   state.loadingToken += 1;
   $("#notebook-view").hidden = true;
   $("#empty-state").hidden = false;
+  $("#run-all").disabled = true;
+  $("#run-all").textContent = "Run all";
 }
 
 function buildQueue() {
@@ -163,24 +170,32 @@ function savedOutputHtml(outputs = []) {
   }).join("");
 }
 function visibleCells() {
-  let cells = $("#show-all").checked ? state.cells : state.cells.slice(0, Math.max(0, state.cells.length - 2));
+  let cells = state.cells.map((cell, cellIndex) => ({cell, cellIndex}));
+  if (!$("#show-all").checked) cells = cells.slice(0, Math.max(0, cells.length - 2));
   if ($("#quick-grade").checked) {
     let code, markdown;
-    cells.forEach((cell, index) => { if (cell.cell_type === "code") code = index; if (cell.cell_type === "markdown") markdown = index; });
+    cells.forEach((entry, index) => { if (entry.cell.cell_type === "code") code = index; if (entry.cell.cell_type === "markdown") markdown = index; });
     const indexes = [code, markdown].filter(value => value !== undefined).sort((a, b) => a - b);
     cells = indexes.map(index => cells[index]);
   }
   return cells;
 }
+function runtimeOutputHtml(runtime) {
+  if (!runtime) return "";
+  const labels = {queued: "Queued", running: "Running…", completed: "Run output", error: "Run error", not_run: "Not run"};
+  const rendered = savedOutputHtml(runtime.outputs || []);
+  const empty = runtime.status === "completed" ? `<pre class="execution-output">Completed with no output.</pre>` : "";
+  return `<div class="runtime-output-header ${runtime.status}">${labels[runtime.status] || "Run output"}${runtime.execution_count ? ` · [${runtime.execution_count}]` : ""}</div>${rendered || empty}`;
+}
 function renderCells() {
   const cells = visibleCells();
-  $("#cells").innerHTML = cells.length ? cells.map((cell, index) => {
+  $("#cells").innerHTML = cells.length ? cells.map(({cell, cellIndex}) => {
     const content = sourceText(cell.source); const output = savedOutputHtml(cell.outputs);
     return `<article class="cell ${cell.cell_type}">
-      <div class="cell-header"><span>${escapeHtml(cell.cell_type)}</span>${cell.cell_type === "code" ? `<button class="button secondary run-code" data-cell="${index}">Run</button>` : ""}</div>
+      <div class="cell-header"><span>${escapeHtml(cell.cell_type)}</span>${cell.cell_type === "code" ? `<button class="button secondary run-code" data-cell="${cellIndex}"${state.runningAll ? " disabled" : ""}>Run</button>` : ""}</div>
       <div class="cell-body">${cell.cell_type === "code" ? `<pre><code>${escapeHtml(content)}</code></pre>` : simpleMarkdown(content)}</div>
       ${output ? `<details><summary class="cell-header">Student output</summary>${output}</details>` : ""}
-      <div class="runtime-output" data-output="${index}"></div>
+      <div class="runtime-output" data-output="${cellIndex}">${runtimeOutputHtml(state.runtimeByCell[cellIndex])}</div>
     </article>`;
   }).join("") : `<div class="empty-state"><p>No visible notebook cells.</p></div>`;
 }
@@ -195,20 +210,22 @@ async function selectSubmission(index) {
   $("#submission-details").innerHTML = details.filter(([, value]) => value).map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("");
   $("#open-colab").href = item.share || "#"; $("#position").textContent = `${index + 1} of ${state.queue.length}`;
   $("#previous").disabled = index <= 0; $("#next").disabled = index >= state.queue.length - 1;
+  state.notebook = null; state.runtimeByCell = {}; state.executionToken += 1;
+  $("#run-all").disabled = true;
   const token = ++state.loadingToken; setStatus("Loading notebook…");
   try {
     const resolved = await api("/api/resolve-notebook", {method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({url: item.share})});
     const notebook = await api(`/api/notebook/${encodeURIComponent(resolved.file_id)}`);
     if (token !== state.loadingToken) return;
-    state.cells = notebook.cells || []; setStatus(""); renderCells();
-    if ($("#quick-grade").checked) runAllVisibleCode();
+    state.notebook = notebook; state.cells = notebook.cells || []; setStatus(""); renderCells();
+    $("#run-all").disabled = !state.cells.some(cell => cell.cell_type === "code");
   } catch (error) { if (token === state.loadingToken) setStatus(error.message, true); }
 }
 function setStatus(message, error = false) { const el = $("#notebook-status"); el.textContent = message; el.className = `status${error ? " error" : ""}`; }
 function navigate(offset) { const index = state.selectedIndex + offset; if (index >= 0 && index < state.queue.length) selectSubmission(index); }
 
 async function runCode(button) {
-  const index = Number(button.dataset.cell), cell = visibleCells()[index]; if (!cell) return;
+  const index = Number(button.dataset.cell), cell = state.cells[index]; if (!cell || state.runningAll) return;
   const output = document.querySelector(`[data-output="${index}"]`); button.disabled = true; button.textContent = "Running…";
   output.innerHTML = `<pre class="execution-output">Running with local Python…</pre>`;
   try {
@@ -217,7 +234,40 @@ async function runCode(button) {
   } catch (error) { output.innerHTML = `<pre class="execution-output">${escapeHtml(error.message)}</pre>`; }
   finally { button.disabled = false; button.textContent = "Run"; }
 }
-function runAllVisibleCode() { document.querySelectorAll(".run-code").forEach(button => runCode(button)); }
+
+async function runAllCode() {
+  if (!state.notebook || state.runningAll) return;
+  const codeCells = state.cells.map((cell, cellIndex) => ({cell, cellIndex})).filter(entry => entry.cell.cell_type === "code");
+  if (!codeCells.length) return;
+  const token = ++state.executionToken;
+  state.runningAll = true;
+  state.runtimeByCell = Object.fromEntries(codeCells.map(({cellIndex}) => [cellIndex, {status: "queued", outputs: []}]));
+  $("#show-all").checked = true;
+  $("#quick-grade").checked = false;
+  $("#run-all").disabled = true;
+  $("#run-all").textContent = "Running…";
+  setStatus(`Running ${codeCells.length} code cell${codeCells.length === 1 ? "" : "s"} sequentially…`);
+  renderCells();
+  try {
+    const result = await api("/api/execute-notebook", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({notebook: state.notebook}),
+    });
+    if (token !== state.executionToken) return;
+    state.runtimeByCell = Object.fromEntries(result.cells.map(cell => [cell.cell_index, cell]));
+    renderCells();
+    if (result.success) setStatus(`Run complete · ${result.completed_count} code cell${result.completed_count === 1 ? "" : "s"} executed.`);
+    else setStatus(result.error || "Run all stopped at a cell error.", true);
+  } catch (error) {
+    if (token === state.executionToken) setStatus(error.message, true);
+  } finally {
+    if (token === state.executionToken) {
+      state.runningAll = false;
+      $("#run-all").disabled = false;
+      $("#run-all").textContent = "Run all";
+      renderCells();
+    }
+  }
+}
 
 function renderClassManager() {
   $("#class-list").innerHTML = state.classes.length ? state.classes.map(klass => `
@@ -341,7 +391,8 @@ $("#date-from").addEventListener("change", event => { state.dateFrom = event.tar
 $("#date-to").addEventListener("change", event => { state.dateTo = event.target.value; clearSelection(); buildQueue(); });
 $("#queue").addEventListener("click", event => { const button = event.target.closest("[data-index]"); if (button) selectSubmission(Number(button.dataset.index)); });
 $("#previous").addEventListener("click", () => navigate(-1)); $("#next").addEventListener("click", () => navigate(1));
-$("#show-all").addEventListener("change", renderCells); $("#quick-grade").addEventListener("change", () => { renderCells(); if ($("#quick-grade").checked) runAllVisibleCode(); });
+$("#run-all").addEventListener("click", runAllCode);
+$("#show-all").addEventListener("change", renderCells); $("#quick-grade").addEventListener("change", renderCells);
 $("#cells").addEventListener("click", event => { const button = event.target.closest(".run-code"); if (button) runCode(button); });
 document.addEventListener("keydown", event => { if (!$("#quick-grade").checked || ["INPUT","SELECT","TEXTAREA"].includes(event.target.tagName)) return; if (event.key === "ArrowLeft") navigate(-1); if (event.key === "ArrowRight") navigate(1); });
 

@@ -55,7 +55,7 @@ git push origin main
 1. Open **Manage classes**, add a class, and add its students by full name.
 2. Open or refresh the app. It automatically downloads the latest rows from the configured public master Google Sheet. Use **Refresh submissions** to check again at any time. **Import file** remains available as a manual `.xlsx` fallback.
 3. Choose an assignment and optionally a class. The queue shows only that class roster, in roster order.
-4. Select a student to load their shared Colab notebook. You can inspect saved outputs, run code locally, open the original notebook in Colab, or use Quick grade with the arrow keys.
+4. Select a student to load their shared Colab notebook. Use **Run all** to execute every code cell sequentially in one Python kernel, with each result displayed under its source cell. You can also run an individual cell, inspect saved outputs, open the original notebook in Colab, or use Quick grade with the arrow keys.
 
 Application data is saved in `data/sheet_explorer.db`. Set `SHEET_EXPLORER_DB` to use another database path.
 

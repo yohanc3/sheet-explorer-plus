@@ -134,6 +134,10 @@ code, pre, .execution-output { font: .85rem/1.55 ui-monospace, SFMono-Regular, M
 .saved-output-html { padding: 14px 16px; overflow: auto; border-top: 1px solid var(--line); background: #f8faf9; }
 .saved-html-frame { width: 100%; min-height: 160px; border: 0; background: white; }
 .output-image { display: block; max-width: 100%; margin: 12px auto; }
+.runtime-output:empty { display: none; }
+.runtime-output-header { padding: 8px 16px; border-top: 1px solid var(--line); color: var(--accent); background: #f1f7f5; font-size: .72rem; font-weight: 760; letter-spacing: .07em; text-transform: uppercase; }
+.runtime-output-header.error { color: var(--danger); background: var(--danger-soft); }
+.runtime-output-header.queued, .runtime-output-header.not_run { color: var(--muted); background: #f8faf9; }
 
 dialog { width: min(760px, calc(100% - 28px)); max-height: calc(100vh - 40px); padding: 26px; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
 dialog::backdrop { background: rgba(16, 27, 25, .48); backdrop-filter: blur(2px); }
