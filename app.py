@@ -450,10 +450,19 @@ def resolve_notebook():
 @app.post("/api/execute-python")
 def execute_python():
     payload = request.get_json(silent=True) or {}
+    interactive = payload.get("interactive") is True
+    provided_inputs = payload.get("inputs", [])
+    if interactive and (
+        not isinstance(provided_inputs, list)
+        or len(provided_inputs) > 100
+        or any(not isinstance(value, str) or len(value) > 10_000 for value in provided_inputs)
+    ):
+        return jsonify(error="Interactive input values are invalid.", success=False), 400
     cell = payload.get("cell")
     if isinstance(cell, dict):
         cell = copy.deepcopy(cell)
-        add_saved_inputs(cell)
+        if not interactive:
+            add_saved_inputs(cell)
         code = source_text(cell.get("source", ""))
     else:
         code = payload.get("code")
@@ -464,6 +473,11 @@ def execute_python():
     with tempfile.TemporaryDirectory(prefix="sheet-explorer-") as directory:
         code_path = Path(directory) / "student_code.py"
         code_path.write_text(code, encoding="utf-8")
+        command = [sys.executable, str(ROOT / "execution_runner.py"), str(code_path)]
+        if interactive:
+            inputs_path = Path(directory) / "inputs.json"
+            inputs_path.write_text(json.dumps(provided_inputs), encoding="utf-8")
+            command.append(str(inputs_path))
         try:
             environment = os.environ.copy()
             python_path = environment.get("PYTHONPATH")
@@ -471,12 +485,12 @@ def execute_python():
                 [str(ROOT / "runtime_shims"), *([python_path] if python_path else [])]
             )
             completed = subprocess.run(
-                [sys.executable, str(ROOT / "execution_runner.py"), str(code_path)],
+                command,
                 capture_output=True, text=True, input="", timeout=30, cwd=directory,
                 env=environment,
             )
             result = json.loads(completed.stdout)
-            return jsonify(result), (200 if result.get("success") else 422)
+            return jsonify(result), (200 if result.get("success") or result.get("needs_input") else 422)
         except subprocess.TimeoutExpired:
             return jsonify(success=False, output="", error="Execution stopped after 30 seconds."), 408
         except (json.JSONDecodeError, OSError) as exc:

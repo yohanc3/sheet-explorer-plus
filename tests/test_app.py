@@ -186,6 +186,42 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(executed.status_code, 200)
         self.assertTrue(executed.get_json()["success"])
 
+    def test_execute_python_requests_grader_input_until_cell_completes(self):
+        cell = {
+            "cell_type": "code",
+            "source": (
+                "while True:\n"
+                "    fruit = input('Which fruit? ')\n"
+                "    if fruit == 'orange':\n"
+                "        print('Correct.')\n"
+                "        break\n"
+                "    print('Try again.')"
+            ),
+            "outputs": [],
+        }
+
+        first = self.client.post(
+            "/api/execute-python",
+            json={"cell": cell, "inputs": [], "interactive": True},
+        )
+        second = self.client.post(
+            "/api/execute-python",
+            json={"cell": cell, "inputs": ["apple"], "interactive": True},
+        )
+        completed = self.client.post(
+            "/api/execute-python",
+            json={"cell": cell, "inputs": ["apple", "orange"], "interactive": True},
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertTrue(first.get_json()["needs_input"])
+        self.assertEqual(first.get_json()["prompt"], "Which fruit? ")
+        self.assertTrue(second.get_json()["needs_input"])
+        self.assertIn("Try again.", second.get_json()["output"])
+        self.assertEqual(completed.status_code, 200)
+        self.assertTrue(completed.get_json()["success"])
+        self.assertIn("Correct.", completed.get_json()["output"])
+
     def test_execute_notebook_runs_cells_sequentially_with_per_cell_outputs(self):
         notebook = {
             "nbformat": 4,

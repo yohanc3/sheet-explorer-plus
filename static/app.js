@@ -245,11 +245,41 @@ async function runCode(button) {
   const output = document.querySelector(`[data-output="${index}"]`); button.disabled = true; button.textContent = "Running…";
   output.innerHTML = `<pre class="execution-output">Running with local Python…</pre>`;
   try {
-    const result = await api("/api/execute-python", {method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({cell})});
-    output.innerHTML = `<pre class="execution-output">${escapeHtml(result.output || result.error || "Completed with no text output.")}</pre>` + (result.plots || []).map(plot => `<img class="output-image" alt="Python plot" src="data:image/png;base64,${plot}">`).join("");
+    const inputs = [];
+    while (true) {
+      const result = await api("/api/execute-python", {method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({cell, inputs, interactive: true})});
+      if (result.needs_input) {
+        const value = await requestCodeInput(result.prompt);
+        if (value === null) { output.innerHTML = `<pre class="execution-output">Run canceled while waiting for input.</pre>`; break; }
+        inputs.push(value);
+        continue;
+      }
+      output.innerHTML = `<pre class="execution-output">${escapeHtml(result.output || result.error || "Completed with no text output.")}</pre>` + (result.plots || []).map(plot => `<img class="output-image" alt="Python plot" src="data:image/png;base64,${plot}">`).join("");
+      break;
+    }
   } catch (error) { output.innerHTML = `<pre class="execution-output">${escapeHtml(error.message)}</pre>`; }
   finally { button.disabled = false; button.textContent = "Run"; }
 }
+
+const codeInputDialog = $("#code-input-dialog");
+let codeInputResolver = null;
+function finishCodeInput(value) {
+  if (!codeInputResolver) return;
+  const resolve = codeInputResolver;
+  codeInputResolver = null;
+  codeInputDialog.close();
+  resolve(value);
+}
+function requestCodeInput(prompt) {
+  $("#code-input-prompt").textContent = prompt || "Enter a value for input().";
+  $("#code-input-value").value = "";
+  codeInputDialog.showModal();
+  requestAnimationFrame(() => $("#code-input-value").focus());
+  return new Promise(resolve => { codeInputResolver = resolve; });
+}
+$("#code-input-form").addEventListener("submit", event => { event.preventDefault(); finishCodeInput($("#code-input-value").value); });
+$("#code-input-cancel").addEventListener("click", () => finishCodeInput(null));
+codeInputDialog.addEventListener("cancel", event => { event.preventDefault(); finishCodeInput(null); });
 
 async function runAllCode() {
   if (!state.notebook || state.runningAll) return;
